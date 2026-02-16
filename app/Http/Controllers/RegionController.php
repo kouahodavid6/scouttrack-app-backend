@@ -53,7 +53,7 @@ class RegionController extends Controller
             'niveau' => 'required|string|max:255',
             'tel' => 'required|digits:10|unique:regions,tel',
             'email' => 'required|email|unique:regions,email',
-            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
         // Erreur de validation
