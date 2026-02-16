@@ -66,8 +66,11 @@ class JeuneController extends Controller
 
         // Générer le mot de passe
         $generatedPassword = $this->generatePassword();
-        // Upload de l'image
-        $image = $this->uploadImageToHosting($request->photo);
+        // Upload de la photo (seulement si présente)
+        $image = null;
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            $image = $this->uploadImageToHosting($request->photo);
+        }
 
         try {
             $user = $request->user();
