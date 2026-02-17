@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 // jokereasy10@gmail.com
-// CC-URQ86cxJ
+// C-URQ86cxJ
 class CUController extends Controller
 {
     //Générer un mot de passe aléatoire
