@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 // kouahodavid007@gmail.com
-// GroA6Sct0X
+// GroDMuOu8t
 class GroupeController extends Controller
 {
     //Générer un mot de passe aléatoire
