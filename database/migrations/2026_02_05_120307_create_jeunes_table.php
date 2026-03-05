@@ -24,7 +24,7 @@ return new class extends Migration
 
             $table->integer('role')->default(1);
             
-            // Clé étrangère vers la table CUs
+            // Clé étrangères
             $table->uuid('cu_id');
             $table->foreign('cu_id')
                 ->references('id')
