@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Etape;
+use App\Models\Branche;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Throwable;
 
-class EtapeController extends Controller
+class BrancheController extends Controller
 {
-    //Ajouter une étape
-    public function createEtape (Request $request) {
+    // Ajouter une branche
+    public function createBranche (Request $request) {
         $validator = Validator::make($request->all(), [
-            'nom' => 'required|string|max:255'
+            'nomBranche' => 'required|string|max:255'
         ]);
 
+        // Erreur de validation
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -23,49 +25,50 @@ class EtapeController extends Controller
         }
 
         try {
-            $etape = new Etape();
-            $etape->nom = $request->nom;
-            $etape->save();
+            $branche = new Branche();
+            $branche->nomBranche = $request->nomBranche;
+            $branche->save();
 
             return response()->json([
                 'success' => true,
-                'data' => $etape,
-                'message' => 'Étape créée avec succès'
+                'data' => $branche,
+                'message' => 'Branche créée avec succès'
             ], 200);
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création de l’étape',
+                'message' => 'Erreur lors de la création de la branche',
                 'erreur' => $e->getMessage()
             ], 500);
         }
     }
 
-    // Lister les étapes
-    public function readEtapes () {
+    // Lister toutes les branches
+    public function readBranches () {
         try {
-            $etapes = Etape::all();
+            $branches = Branche::all();
 
             return response()->json([
                 'success' => true,
-                'data' => $etapes,
-                'message' => 'Liste des étapes affichée avec succès'
+                'data' => $branches,
+                'message' => 'Liste des branches affichée avec succès'
             ], 200);
-        } catch (QueryException $e) {
+        } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors du chargement des étapes',
+                'message' => 'Erreur lors du chargement des branches',
                 'erreur' => $e->getMessage()
             ], 500);
         }
     }
 
-    // Modifier une étape
-        public function updateEtape (Request $request, $id) {
+    // Modifier un branche
+    public function updateBranche (Request $request, $id) {
         $validator = Validator::make($request->all(), [
-            'nom' => 'nullable|string|max:255'
+            'nomBranche' => 'nullable|string|max:255'
         ]);
 
+        // Erreur de validation
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -74,52 +77,52 @@ class EtapeController extends Controller
         }
 
         try {
-            $etape = Etape::find($id);
+            $branche = Branche::find($id);
 
-            if (!$etape) {
+            if (!$branche) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'cette étape n’existe pas'
+                    'message' =>'Cette branche n’existe pas'
                 ], 404);
             }
-            $etape->nom = $request->nom ?? $etape->nom;
-            $etape->save();
+            $branche->nomBranche = $request->nomBranche ?? $branche->nomBranche;
+            $branche->save();
 
             return response()->json([
                 'success' => true,
-                'data' => $etape,
-                'message' => 'Étape modifiée avec succès'
+                'data' => $branche,
+                'message' => 'Branche modifiée avec succès'
             ], 200);
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création de l’étape',
+                'message' => 'Erreur lors de la création de la branche',
                 'erreur' => $e->getMessage()
             ], 500);
         }
     }
 
-    // Supprimer une étape
-    public function deleteEtape ($id) {
+    // Supprimer une branche
+    public function deleteBranche ($id) {
         try {
-            $etape = Etape::find($id);
+            $branche = Branche::find($id);
 
-            if (!$etape) {
+            if (!$branche) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'cette étape n’existe pas'
+                    'message' =>'Cette branche n’existe pas'
                 ], 404);
             }
-            $etape->delete();
+            $branche->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Étape supprimée avec succès'
+                'message' => 'Branche supprimée avec succès'
             ], 200);
-        } catch (QueryException $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la suppression de l’étape',
+                'message' => 'Erreur lors de la suppression de la branche',
                 'erreur' => $e->getMessage()
             ], 500);
         }

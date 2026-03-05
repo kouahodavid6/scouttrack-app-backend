@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Branche;
 use App\Models\Nation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -26,5 +28,22 @@ class DatabaseSeeder extends Seeder
         // $nation->save();
 
         // $this->command->info('Création du commissaire national');
+
+        //Ajout de branches
+        $branches = [
+            'Le Nid',
+            'La Meute',
+            'La Troupe',
+            'La Génération',
+            'La Communauté',
+        ];
+
+        foreach ($branches as $branche) {
+            $newBranche = new Branche();
+            $newBranche->id = (string) Str::uuid();
+            $newBranche->nomBranche = $branche;
+            $newBranche->save();
+        }
+        $this->command->info("     - Toutes les branches crees");
     }
 }
