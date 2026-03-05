@@ -5,6 +5,7 @@ use App\Http\Controllers\RegionController;
 use App\Http\Controllers\DistrictController;
 use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\CUController;
+use App\Http\Controllers\EtapeController;
 use App\Http\Controllers\JeuneController;
 use Illuminate\Support\Facades\Route;
 
@@ -40,10 +41,17 @@ Route::middleware('auth:groupe')->group(function() {
 
 // -------------------------Toutes les action pour chef d'unité-------------------------
 Route::middleware('auth:cu')->group(function() {
+    // Opération CRUD pour jeunes
     Route::post('/create/jeune', [JeuneController::class, 'createJeune']);
     Route::get('/read/jeunes', [JeuneController::class, 'readJeunes']);
     Route::delete('/delete/jeune/{id}', [JeuneController::class, 'deleteJeune']);
-});
+
+    // Opération CRUD pour étapes
+    });
+    Route::post('/create/etape', [EtapeController::class, 'createEtape']);
+    Route::get('/read/etapes', [EtapeController::class, 'readEtapes']);
+    Route::put('/update/etape/{id}', [EtapeController::class, 'updateEtape']);
+    Route::delete('/delete/etape/{id}', [EtapeController::class, 'deleteEtape']);
 
 // -------------------------Toutes les action pour jeune-------------------------
 Route::middleware('auth:jeune')->group(function() {});
