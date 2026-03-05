@@ -130,11 +130,11 @@ class AuthController extends Controller
                     'data' => [
                         'id' => $cu->id,
                         'nom' => $cu->nom,
-                        'niveau' => $cu->niveau,
                         'tel' => $cu->tel,
                         'email' => $cu->email,
                         'photo' => $cu->photo,
                         'groupe_id' => $cu->groupe_id,
+                        'branche_id' => $cu->branche_id,
                         'role' => $cu->role,
                         'type' => 'cu',
                         'token' => $token
@@ -154,11 +154,11 @@ class AuthController extends Controller
                         'id' => $jeune->id,
                         'nom' => $jeune->nom,
                         'age' => $jeune->age,
-                        'niveau' => $jeune->niveau,
                         'tel' => $jeune->tel,
                         'email' => $jeune->email,
                         'photo' => $jeune->photo,
                         'cu_id' => $jeune->cu_id,
+                        'branche_id' => $jeune->branche_id,
                         'role' => $jeune->role,
                         'type' => 'jeune',
                         'token' => $token
