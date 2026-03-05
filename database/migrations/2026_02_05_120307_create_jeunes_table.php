@@ -16,7 +16,6 @@ return new class extends Migration
 
             $table->string('nom')->nullable();
             $table->integer('age');
-            $table->string('niveau');
             $table->string('tel')->unique()->nullable();
             $table->string('photo')->nullable();
 
@@ -30,6 +29,12 @@ return new class extends Migration
             $table->foreign('cu_id')
                 ->references('id')
                 ->on('c_u_s')
+                ->onDelete('cascade');
+
+            $table->uuid('branche_id');
+            $table->foreign('branche_id')
+                ->references('id')
+                ->on('branches')
                 ->onDelete('cascade');
 
             $table->timestamps();

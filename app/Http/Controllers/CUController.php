@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SendCredentialsMail;
+use App\Models\Branche;
 use App\Models\CU;
 use App\Models\Groupe;
 use Illuminate\Database\QueryException;
@@ -49,10 +50,10 @@ class CUController extends Controller
     public function createCU (Request $request) {
         $validator = Validator::make($request->all(), [
             'nom' => 'required|string|max:255',
-            'niveau' => 'required|string|max:255',
             'tel' => 'required|digits:10|unique:c_u_s,tel',
             'email' => 'required|email|unique:c_u_s,email',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'branche_id' => 'required'
         ]);
 
         // Erreur de validation
@@ -61,6 +62,14 @@ class CUController extends Controller
                 'success' => false,
                 'message' => $validator->errors()->first()
             ], 422);
+        }
+
+        $branche = Branche::find($request->branche_id);
+        if (!$branche) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Branche introuvable'
+            ], 404);
         }
 
         // Générer le mot de passe
@@ -85,13 +94,13 @@ class CUController extends Controller
 
             $cu = new CU();
             $cu->nom = $request->nom;
-            $cu->niveau = $request->niveau;
             $cu->tel = $request->tel;
             $cu->email = $request->email;
             $cu->photo = $image;
             $cu->password = Hash::make($generatedPassword);
             $cu->role = 1;
             $cu->groupe_id = $groupe->id;
+            $cu->branche_id = $request->branche_id;
             $cu->save();
 
             // ENVOYER L'EMAIL AVEC LE SERVICE UNIVERSEL
@@ -120,7 +129,7 @@ class CUController extends Controller
     // Lister tous les chefs d'unités
     public function readCUs () {
         try {
-            $cus = CU::all();
+            $cus = CU::with('branche')->get();
 
             return response()->json([
                 'success' => true,

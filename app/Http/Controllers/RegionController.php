@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 // davidkouaho0@gmail.com
-// RegC4Up3Ty
+// Regujat7pN
 class RegionController extends Controller
 {
     //Générer un mot de passe aléatoire

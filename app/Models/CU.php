@@ -15,13 +15,13 @@ class CU extends Model
 
     protected $fillable = [
         'nom',
-        'niveau',
         'tel',
         'photo',
         'email',
         'password',
         'role',
-        'groupe_id'
+        'groupe_id',
+        'branche_id'
     ];
 
     protected $hidden = [
@@ -53,5 +53,10 @@ class CU extends Model
     public function jeunes(): HasMany
     {
         return $this->hasMany(Jeune::class);
+    }
+
+    public function branche(): BelongsTo
+    {
+        return $this->belongsTo(Branche::class);
     }
 }

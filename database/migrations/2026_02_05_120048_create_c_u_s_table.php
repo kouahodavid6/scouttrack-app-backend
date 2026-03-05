@@ -15,7 +15,6 @@ return new class extends Migration
             $table->uuid('id')->primary();
 
             $table->string('nom')->nullable();
-            $table->string('niveau');
             $table->string('tel')->unique()->nullable();
             $table->string('photo')->nullable();
 
@@ -29,6 +28,12 @@ return new class extends Migration
             $table->foreign('groupe_id')
                 ->references('id')
                 ->on('groupes')
+                ->onDelete('cascade');
+
+            $table->uuid('branche_id');
+            $table->foreign('branche_id')
+                ->references('id')
+                ->on('branches')
                 ->onDelete('cascade');
 
             $table->timestamps();

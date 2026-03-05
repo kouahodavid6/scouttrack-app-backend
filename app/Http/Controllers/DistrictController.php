@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 // davidkouaho100@gmail.com
-// DisCo5dqY6
+// DislcPa7jm
 class DistrictController extends Controller
 {
     //Générer un mot de passe aléatoire

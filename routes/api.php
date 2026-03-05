@@ -41,11 +41,11 @@ Route::middleware('auth:groupe')->group(function() {
     Route::delete('/delete/cu/{id}', [CUController::class, 'deleteCU']);
 
     // Opérations CRUD pour branches
-    });
     Route::post('/create/branche', [BrancheController::class, 'createBranche']);
     Route::get('/read/branches', [BrancheController::class, 'readBranches']);
     Route::put('/update/branche/{id}', [BrancheController::class, 'updateBranche']);
     Route::delete('/delete/branche/{id}', [BrancheController::class, 'deleteBranche']);
+});
 
 // -------------------------Toutes les action pour chef d'unité-------------------------
 Route::middleware('auth:cu')->group(function() {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SendCredentialsMail;
+use App\Models\Branche;
 use App\Models\CU;
 use App\Models\Jeune;
 use Illuminate\Database\QueryException;
@@ -50,10 +51,10 @@ class JeuneController extends Controller
         $validator = Validator::make($request->all(), [
             'nom' => 'required|string|max:255',
             'age' => 'required|integer|min:4|max:21',
-            'niveau' => 'required|string|max:255',
             'tel' => 'required|digits:10|unique:jeunes,tel',
             'email' => 'required|email|unique:jeunes,email',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'branche_id' => 'required'
         ]);
 
         // Erreur de validation
@@ -62,6 +63,14 @@ class JeuneController extends Controller
                 'success' => false,
                 'message' => $validator->errors()->first()
             ], 422);
+        }
+
+        $branche = Branche::find($request->branche_id);
+        if (!$branche) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Branche introuvable'
+            ], 404);
         }
 
         // Générer le mot de passe
@@ -87,13 +96,13 @@ class JeuneController extends Controller
             $jeune = new Jeune();
             $jeune->nom = $request->nom;
             $jeune->age = $request->age;
-            $jeune->niveau = $request->niveau;
             $jeune->tel = $request->tel;
             $jeune->email = $request->email;
             $jeune->photo = $image;
             $jeune->password = Hash::make($generatedPassword);
             $jeune->role = 1;
             $jeune->cu_id = $cu->id;
+            $jeune->branche_id = $request->branche_id;
             $jeune->save();
 
             // ENVOYER L'EMAIL AVEC LE SERVICE UNIVERSEL
@@ -122,7 +131,7 @@ class JeuneController extends Controller
     // Lister tous les chefs d'unités
     public function readJeunes () {
         try {
-            $cus = Jeune::all();
+            $cus = Jeune::with('branche')->get();
 
             return response()->json([
                 'success' => true,

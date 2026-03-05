@@ -21,7 +21,8 @@ class Jeune extends Model
         'email',
         'password',
         'role',
-        'cu_id'
+        'cu_id',
+        'branche_id'
     ];
 
     protected $hidden = [
@@ -47,5 +48,10 @@ class Jeune extends Model
     public function cu(): BelongsTo
     {
         return $this->belongsTo(CU::class);
+    }
+
+    public function branche(): BelongsTo
+    {
+        return $this->belongsTo(Branche::class);
     }
 }
