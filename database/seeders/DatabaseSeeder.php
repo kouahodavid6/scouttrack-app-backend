@@ -15,16 +15,16 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        $nation = new Nation();
-        $nation->nom = 'Kouaho David';
-        $nation->niveau = 'Nation';
-        $nation->tel = '0171136261';
-        $nation->photo = null;
-        $nation->email = 'kouahodavid6@gmail.com';
-        $nation->password = Hash::make('KouahoDavid10@**');
-        $nation->role = 1;
-        $nation->save();
+        // $nation = new Nation();
+        // $nation->nom = 'Kouaho David';
+        // $nation->niveau = 'Nation';
+        // $nation->tel = '0171136261';
+        // $nation->photo = null;
+        // $nation->email = 'kouahodavid6@gmail.com';
+        // $nation->password = Hash::make('KouahoDavid10@**');
+        // $nation->role = 1;
+        // $nation->save();
 
-        $this->command->info('Création du commissaire national');
+        // $this->command->info('Création du commissaire national');
     }
 }
