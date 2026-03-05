@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branche;
 use App\Models\Etape;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -12,7 +13,8 @@ class EtapeController extends Controller
     //Ajouter une étape
     public function createEtape (Request $request) {
         $validator = Validator::make($request->all(), [
-            'nom' => 'required|string|max:255'
+            'nom' => 'required|string|max:255',
+            'branche_id' => 'required'
         ]);
 
         if ($validator->fails()) {
@@ -22,9 +24,18 @@ class EtapeController extends Controller
             ], 422);
         }
 
+        $branche = Branche::find($request->branche_id);
+        if (!$branche) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Branche introuvable'
+            ], 404);
+        }
+
         try {
             $etape = new Etape();
             $etape->nom = $request->nom;
+            $etape->branche_id = $request->branche_id;
             $etape->save();
 
             return response()->json([
@@ -44,7 +55,7 @@ class EtapeController extends Controller
     // Lister les étapes
     public function readEtapes () {
         try {
-            $etapes = Etape::all();
+            $etapes = Etape::with('branche')->get();
 
             return response()->json([
                 'success' => true,

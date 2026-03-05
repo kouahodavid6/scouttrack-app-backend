@@ -14,6 +14,12 @@ return new class extends Migration
         Schema::create('etapes', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('nom')->nullable();
+
+            $table->uuid('branche_id');
+            $table->foreign('branche_id')
+                ->references('id')
+                ->on('branches')
+                ->onDelete('cascade');
             $table->timestamps();
         });
     }
