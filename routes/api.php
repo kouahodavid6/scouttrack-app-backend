@@ -60,12 +60,14 @@ Route::middleware('auth:cu')->group(function() {
     Route::get('/read/etapes', [EtapeController::class, 'readEtapes']);
     Route::put('/update/etape/{id}', [EtapeController::class, 'updateEtape']);
     Route::delete('/delete/etape/{id}', [EtapeController::class, 'deleteEtape']);
+
+    // Opérations CRUD pour les domaines d'activités
+    Route::post('/create/activite', [ActiviteController::class, 'createActivite']);
+    Route::get('/read/activites', [ActiviteController::class, 'readActivites']);
+    Route::post('/update/activite/{id}', [ActiviteController::class, 'updateActivite']);
+    Route::delete('/delete/activite/{id}', [ActiviteController::class, 'deleteActivite']);
 });
 
-Route::post('/create/activite', [ActiviteController::class, 'createActivite']);
-Route::get('/read/activites', [ActiviteController::class, 'readActivites']);
-Route::post('/update/activite/{id}', [ActiviteController::class, 'updateActivite']);
-Route::delete('/delete/activite/{id}', [ActiviteController::class, 'deleteActivite']);
 
 // -------------------------Toutes les action pour jeune-------------------------
 Route::middleware('auth:jeune')->group(function() {});
