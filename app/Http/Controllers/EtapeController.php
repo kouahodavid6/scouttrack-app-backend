@@ -72,9 +72,10 @@ class EtapeController extends Controller
     }
 
     // Modifier une étape
-        public function updateEtape (Request $request, $id) {
+    public function updateEtape (Request $request, $id) {
         $validator = Validator::make($request->all(), [
-            'nom' => 'nullable|string|max:255'
+            'nom' => 'nullable|string|max:255',
+            'branche_id' => 'required'
         ]);
 
         if ($validator->fails()) {
@@ -82,6 +83,14 @@ class EtapeController extends Controller
                 'success' => false,
                 'message' => $validator->errors()->first()
             ], 422);
+        }
+
+        $branche = Branche::find($request->branche_id);
+        if (!$branche) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Branche introuvable'
+            ], 404);
         }
 
         try {
@@ -94,6 +103,7 @@ class EtapeController extends Controller
                 ], 404);
             }
             $etape->nom = $request->nom ?? $etape->nom;
+            $etape->branche_id = $request->branche_id ?? $etape->branche_id;
             $etape->save();
 
             return response()->json([

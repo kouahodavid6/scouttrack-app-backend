@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActiviteController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BrancheController;
 use App\Http\Controllers\RegionController;
@@ -60,6 +61,11 @@ Route::middleware('auth:cu')->group(function() {
     Route::put('/update/etape/{id}', [EtapeController::class, 'updateEtape']);
     Route::delete('/delete/etape/{id}', [EtapeController::class, 'deleteEtape']);
 });
+
+Route::post('/create/activite', [ActiviteController::class, 'createActivite']);
+Route::get('/read/activites', [ActiviteController::class, 'readActivites']);
+Route::post('/update/activite/{id}', [ActiviteController::class, 'updateActivite']);
+Route::delete('/delete/activite/{id}', [ActiviteController::class, 'deleteActivite']);
 
 // -------------------------Toutes les action pour jeune-------------------------
 Route::middleware('auth:jeune')->group(function() {});
