@@ -15,7 +15,6 @@ class Jeune extends Model
     protected $fillable = [
         'nom',
         'age',
-        'niveau',
         'tel',
         'photo',
         'email',
