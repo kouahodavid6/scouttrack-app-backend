@@ -11,6 +11,7 @@ class Etape extends Model
 {
     protected $fillable = [
         'nom',
+        'numEtape',
         'branche_id'
     ];
 

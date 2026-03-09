@@ -14,6 +14,7 @@ class EtapeController extends Controller
     public function createEtape (Request $request) {
         $validator = Validator::make($request->all(), [
             'nom' => 'required|string|max:255',
+            'numEtape' => 'nullable|integer|min:1',
             'branche_id' => 'required'
         ]);
 
@@ -35,6 +36,7 @@ class EtapeController extends Controller
         try {
             $etape = new Etape();
             $etape->nom = $request->nom;
+            $etape->numEtape = $request->numEtape;
             $etape->branche_id = $request->branche_id;
             $etape->save();
 
@@ -55,7 +57,9 @@ class EtapeController extends Controller
     // Lister les étapes
     public function readEtapes () {
         try {
-            $etapes = Etape::with('branche')->get();
+            $etapes = Etape::with('branche')
+                ->orderBy('numEtape', 'asc')
+                ->get();
 
             return response()->json([
                 'success' => true,
@@ -75,6 +79,7 @@ class EtapeController extends Controller
     public function updateEtape (Request $request, $id) {
         $validator = Validator::make($request->all(), [
             'nom' => 'nullable|string|max:255',
+            'numEtape' => 'nullable|integer|min:1',
             'branche_id' => 'required'
         ]);
 
@@ -103,6 +108,7 @@ class EtapeController extends Controller
                 ], 404);
             }
             $etape->nom = $request->nom ?? $etape->nom;
+            $etape->numEtape = $request->numEtape ?? $etape->numEtape;
             $etape->branche_id = $request->branche_id ?? $etape->branche_id;
             $etape->save();
 

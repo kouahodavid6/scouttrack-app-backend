@@ -29,7 +29,7 @@ class Branche extends Model
     /**
      * Une branche a PLUSIEURS étapes
      */
-    public function etapes(): HasMany // ← CORRIGÉ : HasMany au lieu de BelongsTo
+    public function etapes(): HasMany
     {
         return $this->hasMany(Etape::class, 'branche_id');
     }

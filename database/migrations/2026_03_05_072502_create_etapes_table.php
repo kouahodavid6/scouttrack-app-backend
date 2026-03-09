@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('etapes', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('nom')->nullable();
+            $table->integer('numEtape')->default(0);
 
             $table->uuid('branche_id');
             $table->foreign('branche_id')

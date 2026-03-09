@@ -50,6 +50,7 @@ class JeuneProgressionController extends Controller
                 $etapeData = [
                     'id' => $etape->id,
                     'nom' => $etape->nom,
+                    'numEtape' => $etape->numEtape,
                     'activites' => []
                 ];
                 
@@ -68,9 +69,8 @@ class JeuneProgressionController extends Controller
                     ];
                 }
                 
-                if (!empty($etapeData['activites'])) {
-                    $resultat['etapes'][] = $etapeData;
-                }
+                // ajouter toutes les étapes même  celles qui n'ont pas d'activités
+                $jeuneData['etapes'][] = $etapeData;
             }
             
             return response()->json([

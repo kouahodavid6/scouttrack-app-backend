@@ -109,6 +109,7 @@ class SuiviJeuneController extends Controller
                     $etapeData = [
                         'id' => $etape->id,
                         'nom' => $etape->nom,
+                        'numEtape' => $etape->numEtape,
                         'activites' => []
                     ];
                     
@@ -128,10 +129,8 @@ class SuiviJeuneController extends Controller
                         ];
                     }
                     
-                    // N'ajouter l'étape que si elle a des activités
-                    if (!empty($etapeData['activites'])) {
-                        $jeuneData['etapes'][] = $etapeData;
-                    }
+                    // ajouter toutes les étapes même  celles qui n'ont pas d'activités
+                    $jeuneData['etapes'][] = $etapeData;
                 }
                 
                 $resultat[] = $jeuneData;
