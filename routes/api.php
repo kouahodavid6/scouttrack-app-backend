@@ -9,6 +9,7 @@ use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\CUController;
 use App\Http\Controllers\EtapeController;
 use App\Http\Controllers\JeuneController;
+use App\Http\Controllers\SuiviJeuneController; // ← AJOUTER CETTE LIGNE
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -61,13 +62,31 @@ Route::middleware('auth:cu')->group(function() {
     Route::put('/update/etape/{id}', [EtapeController::class, 'updateEtape']);
     Route::delete('/delete/etape/{id}', [EtapeController::class, 'deleteEtape']);
 
-    // Opérations CRUD pour les domaines d'activités
+    // Opérations CRUD pour les activités
     Route::post('/create/activite', [ActiviteController::class, 'createActivite']);
     Route::get('/read/activites', [ActiviteController::class, 'readActivites']);
     Route::post('/update/activite/{id}', [ActiviteController::class, 'updateActivite']);
     Route::delete('/delete/activite/{id}', [ActiviteController::class, 'deleteActivite']);
+
+    // ============ NOUVELLES ROUTES POUR LE SUIVI DES JEUNES ============
+    
+    // Récupérer les jeunes du chef connecté
+    Route::get('/chef/mes-jeunes', [SuiviJeuneController::class, 'getMesJeunes']);
+    
+    // Suivi complet : activités par étape avec statut de participation
+    Route::get('/suivi/jeunes', [SuiviJeuneController::class, 'getSuiviComplet']);
+    
+    // Valider la participation d'un jeune à une activité
+    Route::post('/suivi/valider', [SuiviJeuneController::class, 'validerParticipation']);
+    
+    // Vérifier si une étape est complète pour un jeune
+    Route::get('/suivi/etape-complete', [SuiviJeuneController::class, 'checkEtapeComplete']);
+    
+    // Statistiques d'un jeune
+    Route::get('/suivi/jeune/{id}/statistiques', [SuiviJeuneController::class, 'getStatistiquesJeune']);
 });
 
-
 // -------------------------Toutes les action pour jeune-------------------------
-Route::middleware('auth:jeune')->group(function() {});
+Route::middleware('auth:jeune')->group(function() {
+    // À compléter plus tard
+});

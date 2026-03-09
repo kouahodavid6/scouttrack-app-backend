@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany; // ← CHANGER ICI
 use Illuminate\Support\Str;
 
 class Branche extends Model
@@ -23,5 +24,13 @@ class Branche extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+    }
+
+    /**
+     * Une branche a PLUSIEURS étapes
+     */
+    public function etapes(): HasMany // ← CORRIGÉ : HasMany au lieu de BelongsTo
+    {
+        return $this->hasMany(Etape::class, 'branche_id');
     }
 }
