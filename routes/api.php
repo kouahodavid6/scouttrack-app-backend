@@ -9,6 +9,7 @@ use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\CUController;
 use App\Http\Controllers\EtapeController;
 use App\Http\Controllers\JeuneController;
+use App\Http\Controllers\JeuneProgressionController;
 use App\Http\Controllers\SuiviJeuneController; // ← AJOUTER CETTE LIGNE
 use Illuminate\Support\Facades\Route;
 
@@ -88,5 +89,7 @@ Route::middleware('auth:cu')->group(function() {
 
 // -------------------------Toutes les action pour jeune-------------------------
 Route::middleware('auth:jeune')->group(function() {
-    // À compléter plus tard
+    // Consultation de la progression (lecture seule)
+    Route::get('/mon-suivi', [JeuneProgressionController::class, 'getMaProgression']);
+    Route::get('/mes-statistiques', [JeuneProgressionController::class, 'getMesStatistiques']);
 });
