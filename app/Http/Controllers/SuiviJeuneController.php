@@ -30,9 +30,12 @@ class SuiviJeuneController extends Controller
                 ], 404);
             }
             
-            // Récupérer tous les jeunes de ce chef avec leur branche
-            $jeunes = Jeune::with('branche')
+            // Récupérer tous les jeunes de ce chef avec leur branche (triée par ordre)
+            $jeunes = Jeune::with(['branche' => function($query) {
+                $query->orderBy('ordreBranche');
+            }])
                 ->where('cu_id', $chef->id)
+                ->orderBy('nom')
                 ->get();
             
             return response()->json([
@@ -67,9 +70,18 @@ class SuiviJeuneController extends Controller
                 ], 404);
             }
             
-            // 2. Récupérer tous les jeunes du chef avec leurs relations
-            $jeunes = Jeune::with(['branche.etapes.activites'])
+            // 2. Récupérer tous les jeunes du chef avec leurs relations (triées)
+            $jeunes = Jeune::with([
+                'branche' => function($query) {
+                    $query->orderBy('ordreBranche');
+                }, 
+                'branche.etapes' => function($query) {
+                    $query->orderBy('numEtape');
+                }, 
+                'branche.etapes.activites'
+            ])
                 ->where('cu_id', $chef->id)
+                ->orderBy('nom')
                 ->get();
             
             // 3. Récupérer toutes les participations (act_jeune) pour ces jeunes
@@ -99,12 +111,13 @@ class SuiviJeuneController extends Controller
                     'photo' => $jeune->photo,
                     'branche' => [
                         'id' => $jeune->branche->id,
-                        'nom' => $jeune->branche->nomBranche
+                        'nom' => $jeune->branche->nomBranche,
+                        'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
                     ],
                     'etapes' => []
                 ];
                 
-                // Parcourir les étapes de la branche du jeune
+                // Parcourir les étapes de la branche du jeune (déjà triées par numEtape)
                 foreach ($jeune->branche->etapes as $etape) {
                     $etapeData = [
                         'id' => $etape->id,
@@ -113,8 +126,11 @@ class SuiviJeuneController extends Controller
                         'activites' => []
                     ];
                     
+                    // Trier les activités par nom
+                    $activites = $etape->activites->sortBy('nom_act');
+                    
                     // Parcourir les activités de l'étape
-                    foreach ($etape->activites as $activite) {
+                    foreach ($activites as $activite) {
                         $key = $jeune->id . '_' . $activite->id;
                         $isParticipated = isset($participationMap[$key]);
                         
@@ -129,7 +145,7 @@ class SuiviJeuneController extends Controller
                         ];
                     }
                     
-                    // ajouter toutes les étapes même  celles qui n'ont pas d'activités
+                    // Ajouter toutes les étapes même celles qui n'ont pas d'activités
                     $jeuneData['etapes'][] = $etapeData;
                 }
                 
@@ -298,7 +314,11 @@ class SuiviJeuneController extends Controller
             $user = $request->user();
             $chef = CU::find($user->id);
             
-            $jeune = Jeune::with('branche.etapes.activites')
+            $jeune = Jeune::with(['branche' => function($query) {
+                $query->orderBy('ordreBranche');
+            }, 'branche.etapes' => function($query) {
+                $query->orderBy('numEtape');
+            }, 'branche.etapes.activites'])
                 ->where('id', $id)
                 ->where('cu_id', $chef->id)
                 ->first();
@@ -308,6 +328,25 @@ class SuiviJeuneController extends Controller
                     'success' => false,
                     'message' => 'Jeune introuvable ou ne vous appartient pas'
                 ], 404);
+            }
+            
+            // Vérifier que le jeune a une branche
+            if (!$jeune->branche) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'jeune' => [
+                            'id' => $jeune->id,
+                            'nom' => $jeune->nom
+                        ],
+                        'statistiques' => [
+                            'total_activites_branche' => 0,
+                            'activites_validees' => 0,
+                            'pourcentage_progression' => '0%'
+                        ]
+                    ],
+                    'message' => 'Ce jeune n\'est pas assigné à une branche'
+                ], 200);
             }
             
             // Compter les participations
@@ -330,6 +369,11 @@ class SuiviJeuneController extends Controller
                     'jeune' => [
                         'id' => $jeune->id,
                         'nom' => $jeune->nom
+                    ],
+                    'branche' => [
+                        'id' => $jeune->branche->id,
+                        'nom' => $jeune->branche->nomBranche,
+                        'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
                     ],
                     'statistiques' => [
                         'total_activites_branche' => $totalActivitesBranche,

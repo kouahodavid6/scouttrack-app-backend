@@ -20,8 +20,12 @@ class JeuneProgressionController extends Controller
             // Récupérer le jeune connecté
             $jeune = $request->user(); // L'utilisateur est un jeune (guard 'jeune')
             
-            // Charger ses relations
-            $jeune->load(['branche.etapes.activites']);
+            // Charger ses relations avec tri de la branche par ordreBranche
+            $jeune->load(['branche' => function($query) {
+                $query->orderBy('ordreBranche');
+            }, 'branche.etapes' => function($query) {
+                $query->orderBy('numEtape'); // Trier les étapes par numéro d'étape
+            }, 'branche.etapes.activites']);
             
             // Récupérer ses participations
             $participations = Act_Jeune::where('jeune_id', $jeune->id)->get();
@@ -33,6 +37,22 @@ class JeuneProgressionController extends Controller
                 $participationMap[$key] = true;
             }
             
+            // Vérifier que le jeune a une branche
+            if (!$jeune->branche) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'id' => $jeune->id,
+                        'nom' => $jeune->nom,
+                        'age' => $jeune->age,
+                        'photo' => $jeune->photo,
+                        'branche' => null,
+                        'etapes' => []
+                    ],
+                    'message' => 'Vous n\'êtes pas encore assigné à une branche'
+                ], 200);
+            }
+            
             // Construire la réponse (MÊME STRUCTURE QUE getSuiviComplet)
             $resultat = [
                 'id' => $jeune->id,
@@ -41,7 +61,8 @@ class JeuneProgressionController extends Controller
                 'photo' => $jeune->photo,
                 'branche' => [
                     'id' => $jeune->branche->id,
-                    'nom' => $jeune->branche->nomBranche
+                    'nom' => $jeune->branche->nomBranche,
+                    'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
                 ],
                 'etapes' => []
             ];
@@ -54,7 +75,10 @@ class JeuneProgressionController extends Controller
                     'activites' => []
                 ];
                 
-                foreach ($etape->activites as $activite) {
+                // Trier les activités par date ou par nom si nécessaire
+                $activites = $etape->activites->sortBy('nom_act');
+                
+                foreach ($activites as $activite) {
                     $key = $jeune->id . '_' . $activite->id;
                     $isParticipated = isset($participationMap[$key]);
                     
@@ -69,8 +93,8 @@ class JeuneProgressionController extends Controller
                     ];
                 }
                 
-                // ajouter toutes les étapes même  celles qui n'ont pas d'activités
-                $jeuneData['etapes'][] = $etapeData;
+                // Ajouter toutes les étapes même celles qui n'ont pas d'activités
+                $resultat['etapes'][] = $etapeData;
             }
             
             return response()->json([
@@ -96,7 +120,27 @@ class JeuneProgressionController extends Controller
     {
         try {
             $jeune = $request->user();
-            $jeune->load('branche.etapes.activites');
+            
+            // Charger les relations avec tri
+            $jeune->load(['branche' => function($query) {
+                $query->orderBy('ordreBranche');
+            }, 'branche.etapes' => function($query) {
+                $query->orderBy('numEtape');
+            }, 'branche.etapes.activites']);
+            
+            // Vérifier que le jeune a une branche
+            if (!$jeune->branche) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'total_activites_branche' => 0,
+                        'activites_validees' => 0,
+                        'pourcentage_progression' => '0%',
+                        'etapes' => []
+                    ],
+                    'message' => 'Vous n\'êtes pas encore assigné à une branche'
+                ], 200);
+            }
             
             $totalParticipations = Act_Jeune::where('jeune_id', $jeune->id)->count();
             
@@ -115,6 +159,11 @@ class JeuneProgressionController extends Controller
                     'total_activites_branche' => $totalActivitesBranche,
                     'activites_validees' => $totalParticipations,
                     'pourcentage_progression' => $pourcentage . '%',
+                    'branche' => [
+                        'id' => $jeune->branche->id,
+                        'nom' => $jeune->branche->nomBranche,
+                        'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
+                    ],
                     'etapes' => $jeune->branche->etapes->map(function($etape) use ($jeune) {
                         $activitesValidees = Act_Jeune::where('jeune_id', $jeune->id)
                             ->whereIn('activite_id', $etape->activites->pluck('id'))
@@ -123,6 +172,7 @@ class JeuneProgressionController extends Controller
                         return [
                             'id' => $etape->id,
                             'nom' => $etape->nom,
+                            'numEtape' => $etape->numEtape,
                             'total_activites' => $etape->activites->count(),
                             'activites_validees' => $activitesValidees,
                             'est_complete' => $activitesValidees === $etape->activites->count() && $etape->activites->count() > 0

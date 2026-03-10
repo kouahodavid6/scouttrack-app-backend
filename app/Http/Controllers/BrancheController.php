@@ -13,7 +13,8 @@ class BrancheController extends Controller
     // Ajouter une branche
     public function createBranche (Request $request) {
         $validator = Validator::make($request->all(), [
-            'nomBranche' => 'required|string|max:255'
+            'nomBranche' => 'required|string|max:255',
+            'ordreBranche' => 'nullable|integer|min:0' // ← AJOUT ICI
         ]);
 
         // Erreur de validation
@@ -27,6 +28,7 @@ class BrancheController extends Controller
         try {
             $branche = new Branche();
             $branche->nomBranche = $request->nomBranche;
+            $branche->ordreBranche = $request->ordreBranche ?? 0; // ← AJOUT ICI
             $branche->save();
 
             return response()->json([
@@ -46,7 +48,8 @@ class BrancheController extends Controller
     // Lister toutes les branches
     public function readBranches () {
         try {
-            $branches = Branche::all();
+            // Trier par ordreBranche puis par nom (optionnel)
+            $branches = Branche::orderBy('ordreBranche')->orderBy('nomBranche')->get();
 
             return response()->json([
                 'success' => true,
@@ -62,10 +65,11 @@ class BrancheController extends Controller
         }
     }
 
-    // Modifier un branche
+    // Modifier une branche
     public function updateBranche (Request $request, $id) {
         $validator = Validator::make($request->all(), [
-            'nomBranche' => 'nullable|string|max:255'
+            'nomBranche' => 'nullable|string|max:255',
+            'ordreBranche' => 'nullable|integer|min:0' // ← AJOUT ICI
         ]);
 
         // Erreur de validation
@@ -85,7 +89,9 @@ class BrancheController extends Controller
                     'message' =>'Cette branche n’existe pas'
                 ], 404);
             }
+            
             $branche->nomBranche = $request->nomBranche ?? $branche->nomBranche;
+            $branche->ordreBranche = $request->ordreBranche ?? $branche->ordreBranche; // ← AJOUT ICI
             $branche->save();
 
             return response()->json([
@@ -96,7 +102,7 @@ class BrancheController extends Controller
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création de la branche',
+                'message' => 'Erreur lors de la modification de la branche',
                 'erreur' => $e->getMessage()
             ], 500);
         }

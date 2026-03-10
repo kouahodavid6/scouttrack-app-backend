@@ -29,21 +29,23 @@ class DatabaseSeeder extends Seeder
 
         // $this->command->info('Création du commissaire national');
 
-        // //Ajout de branches
+        //Ajout de branches
         // $branches = [
-        //     'Lc Colonnie',
-        //     'La Meute',
-        //     'La Troupe',
-        //     'La Génération',
-        //     'La Communauté',
+        //     ['nom' => 'La Colonnie', 'ordre' => 1],
+        //     ['nom' => 'La Meute', 'ordre' => 2],
+        //     ['nom' => 'La Troupe', 'ordre' => 3],
+        //     ['nom' => 'La Génération', 'ordre' => 4],
+        //     ['nom' => 'La Communauté', 'ordre' => 5],
         // ];
 
-        // foreach ($branches as $branche) {
+        // foreach ($branches as $brancheData) {
         //     $newBranche = new Branche();
         //     $newBranche->id = (string) Str::uuid();
-        //     $newBranche->nomBranche = $branche;
+        //     $newBranche->nomBranche = $brancheData['nom'];
+        //     $newBranche->ordreBranche = $brancheData['ordre'];
         //     $newBranche->save();
         // }
-        // $this->command->info("     - Toutes les branches crees");
+        
+        // $this->command->info("     - Toutes les branches créées avec leurs ordres respectifs");
     }
 }

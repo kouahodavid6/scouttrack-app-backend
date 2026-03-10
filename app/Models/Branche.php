@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
 class Branche extends Model
 {
     protected $fillable = [
-        'nomBranche'
+        'nomBranche',
+        'ordreBranche'
     ];
 
     protected $keyType = 'string';

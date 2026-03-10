@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('branches', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('nomBranche');
+            $table->integer('ordreBranche')->default(0);
             $table->timestamps();
         });
     }
