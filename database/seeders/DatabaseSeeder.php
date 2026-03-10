@@ -31,7 +31,7 @@ class DatabaseSeeder extends Seeder
 
         // //Ajout de branches
         // $branches = [
-        //     'Le Nid',
+        //     'Lc Colonnie',
         //     'La Meute',
         //     'La Troupe',
         //     'La Génération',
