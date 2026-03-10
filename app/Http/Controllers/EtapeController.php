@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branche;
 use App\Models\Etape;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -14,8 +13,7 @@ class EtapeController extends Controller
     public function createEtape (Request $request) {
         $validator = Validator::make($request->all(), [
             'nom' => 'required|string|max:255',
-            'numEtape' => 'nullable|integer|min:1',
-            'branche_id' => 'required'
+            'numEtape' => 'nullable|integer|min:1'
         ]);
 
         if ($validator->fails()) {
@@ -25,19 +23,22 @@ class EtapeController extends Controller
             ], 422);
         }
 
-        $branche = Branche::find($request->branche_id);
-        if (!$branche) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Branche introuvable'
-            ], 404);
-        }
-
         try {
+            // ✅ Récupérer le CU connecté
+            $cu = $request->user(); // L'utilisateur est un CU (guard 'cu')
+            
+            if (!$cu || !$cu->branche_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous devez être associé à une branche pour créer une étape'
+                ], 403);
+            }
+
             $etape = new Etape();
             $etape->nom = $request->nom;
             $etape->numEtape = $request->numEtape;
-            $etape->branche_id = $request->branche_id;
+            // ✅ Utiliser la branche du CU connecté
+            $etape->branche_id = $cu->branche_id;
             $etape->save();
 
             return response()->json([
@@ -55,9 +56,13 @@ class EtapeController extends Controller
     }
 
     // Lister les étapes
-    public function readEtapes () {
+    public function readEtapes (Request $request) {
         try {
+            // ✅ Optionnel : filtrer par la branche du CU connecté
+            $cu = $request->user();
+            
             $etapes = Etape::with('branche')
+                ->where('branche_id', $cu->branche_id) // Seulement les étapes de sa branche
                 ->orderBy('numEtape', 'asc')
                 ->get();
 
@@ -79,8 +84,8 @@ class EtapeController extends Controller
     public function updateEtape (Request $request, $id) {
         $validator = Validator::make($request->all(), [
             'nom' => 'nullable|string|max:255',
-            'numEtape' => 'nullable|integer|min:1',
-            'branche_id' => 'required'
+            'numEtape' => 'nullable|integer|min:1'
+            // ✅ SUPPRIMER branche_id de la validation
         ]);
 
         if ($validator->fails()) {
@@ -90,26 +95,28 @@ class EtapeController extends Controller
             ], 422);
         }
 
-        $branche = Branche::find($request->branche_id);
-        if (!$branche) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Branche introuvable'
-            ], 404);
-        }
-
         try {
             $etape = Etape::find($id);
 
             if (!$etape) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'cette étape n’existe pas'
+                    'message' => 'Cette étape n’existe pas'
                 ], 404);
             }
+
+            // ✅ Vérifier que l'étape appartient bien à la branche du CU connecté
+            $cu = $request->user();
+            if ($etape->branche_id !== $cu->branche_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous n\'êtes pas autorisé à modifier cette étape'
+                ], 403);
+            }
+
             $etape->nom = $request->nom ?? $etape->nom;
             $etape->numEtape = $request->numEtape ?? $etape->numEtape;
-            $etape->branche_id = $request->branche_id ?? $etape->branche_id;
+            // ✅ NE PAS MODIFIER la branche_id
             $etape->save();
 
             return response()->json([
@@ -120,23 +127,33 @@ class EtapeController extends Controller
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création de l’étape',
+                'message' => 'Erreur lors de la modification de l’étape',
                 'erreur' => $e->getMessage()
             ], 500);
         }
     }
 
     // Supprimer une étape
-    public function deleteEtape ($id) {
+    public function deleteEtape (Request $request, $id) {
         try {
             $etape = Etape::find($id);
 
             if (!$etape) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'cette étape n’existe pas'
+                    'message' => 'Cette étape n’existe pas'
                 ], 404);
             }
+
+            // ✅ Vérifier que l'étape appartient bien à la branche du CU connecté
+            $cu = $request->user();
+            if ($etape->branche_id !== $cu->branche_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous n\'êtes pas autorisé à supprimer cette étape'
+                ], 403);
+            }
+
             $etape->delete();
 
             return response()->json([
