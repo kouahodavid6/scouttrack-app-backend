@@ -71,13 +71,19 @@ class ActiviteController extends Controller
     // Lister toutes les activités
     public function readActivites () {
         try {
-            $activites = Activite::with('etape')->get();
+
+            $activites = Activite::with('etape')
+                ->join('etapes', 'activites.etape_id', '=', 'etapes.id')
+                ->orderBy('etapes.numEtape', 'asc')
+                ->select('activites.*')
+                ->get();
 
             return response()->json([
                 'success' => true,
                 'data' => $activites,
                 'message' => 'Liste des activités affichée avec succès'
             ], 200);
+
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
