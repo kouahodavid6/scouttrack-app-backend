@@ -94,7 +94,7 @@ Route::middleware('auth:cu')->group(function() {
     Route::post('/create/reunion', [ReunionController::class, 'createReunion']);
     Route::get('/read/reunions', [ReunionController::class, 'readReunions']);
     Route::put('/update/reunion/{id}', [ReunionController::class, 'updateReunion']);
-    Route::delete('/delete/reunion/{id}', [ReunionController::class, 'deleteReunion']);
+    Route::delete('/delete/reunion/{id}', [ReunionController::class, 'deleteReunion']); 
 });
 
 // -------------------------Toutes les action pour jeune-------------------------
