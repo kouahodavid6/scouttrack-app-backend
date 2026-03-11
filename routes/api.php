@@ -10,6 +10,7 @@ use App\Http\Controllers\CUController;
 use App\Http\Controllers\EtapeController;
 use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
+use App\Http\Controllers\ReunionController;
 use App\Http\Controllers\SuiviJeuneController; // ← AJOUTER CETTE LIGNE
 use Illuminate\Support\Facades\Route;
 
@@ -87,6 +88,13 @@ Route::middleware('auth:cu')->group(function() {
     
     // Statistiques d'un jeune
     Route::get('/suivi/jeune/{id}/statistiques', [SuiviJeuneController::class, 'getStatistiquesJeune']);
+
+
+    // ============ NOUVELLES ROUTES POUR LE SUIVI DES des présence du JEUNES aux réunions ============
+    Route::post('/create/reunion', [ReunionController::class, 'createReunion']);
+    Route::get('/read/reunions', [ReunionController::class, 'readReunions']);
+    Route::put('/update/reunion/{id}', [ReunionController::class, 'updateReunion']);
+    Route::delete('/delete/reunion/{id}', [ReunionController::class, 'deleteReunion']);
 });
 
 // -------------------------Toutes les action pour jeune-------------------------
