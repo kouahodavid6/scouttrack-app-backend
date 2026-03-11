@@ -89,11 +89,11 @@ class SuiviJeuneController extends Controller
             $participations = Act_Jeune::whereIn('jeune_id', $jeuneIds)->get();
             
             // 4. Construire un tableau de participation pour un accès rapide
-            $participationMap = [];
-            foreach ($participations as $p) {
-                $key = $p->jeune_id . '_' . $p->activite_id;
-                $participationMap[$key] = true;
-            }
+$participationMap = [];
+foreach ($participations as $p) {
+    $key = $p->jeune_id . '_' . $p->activite_id;
+    $participationMap[$key] = $p->id;
+}
             
             // 5. Construire la réponse structurée
             $resultat = [];
@@ -141,7 +141,8 @@ class SuiviJeuneController extends Controller
                             'badge' => $activite->badge,
                             'date_debut' => $activite->date_debut,
                             'date_fin' => $activite->date_fin,
-                            'is_participated' => $isParticipated
+                            'is_participated' => $isParticipated,
+                            'participation_id' => $participationMap[$key] ?? null
                         ];
                     }
                     
@@ -175,7 +176,6 @@ class SuiviJeuneController extends Controller
         $validator = Validator::make($request->all(), [
             'jeune_id' => 'required|uuid|exists:jeunes,id',
             'activite_id' => 'required|uuid|exists:activites,id',
-            'statut' => 'nullable|string|in:en_cours,valide,echoue'
         ]);
 
         if ($validator->fails()) {
@@ -189,6 +189,13 @@ class SuiviJeuneController extends Controller
             // Vérifier que le jeune appartient bien au chef connecté (sécurité)
             $user = $request->user();
             $chef = CU::find($user->id);
+
+            if (!$chef) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Chef d’unité introuvable'
+                ], 404);
+            }
             
             $jeune = Jeune::where('id', $request->jeune_id)
                 ->where('cu_id', $chef->id)
@@ -217,7 +224,7 @@ class SuiviJeuneController extends Controller
             $participation = new Act_Jeune();
             $participation->jeune_id = $request->jeune_id;
             $participation->activite_id = $request->activite_id;
-            $participation->statut = $request->statut ?? 'valide';
+            $participation->statut = 'valide';
             $participation->save();
             
             // Charger les relations pour la réponse
@@ -233,6 +240,42 @@ class SuiviJeuneController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la validation de la participation',
+                'erreur' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function supprimerParticipation (Request $request, $participation_id) {
+        try {
+            $user = $request->user();
+            $chef = CU::find($user->id);
+
+            if (!$chef) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Chef d’unité introuvable'
+                ], 404);
+            }
+
+            $actJeune = Act_Jeune::find($participation_id);
+            if (!$actJeune) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Participation introuvable'
+                ], 404);
+            }
+            $actJeune->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'La suppression de la participation est un succès'
+            ], 200);
+
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la suppression de la participation',
                 'erreur' => $e->getMessage()
             ], 500);
         }

@@ -79,6 +79,8 @@ Route::middleware('auth:cu')->group(function() {
     
     // Valider la participation d'un jeune à une activité
     Route::post('/suivi/valider', [SuiviJeuneController::class, 'validerParticipation']);
+    // Supprimer la participation d'un jeune à une activité
+    Route::delete('/suivi/invalider/{participation_id}', [SuiviJeuneController::class, 'supprimerParticipation']);
     
     // Vérifier si une étape est complète pour un jeune
     Route::get('/suivi/etape-complete', [SuiviJeuneController::class, 'checkEtapeComplete']);
