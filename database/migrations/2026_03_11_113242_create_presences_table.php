@@ -11,17 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('reunions', function (Blueprint $table) {
+        Schema::create('presences', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->date('date_reunion');
-            $table->time('heure_debut');
-            $table->time('heure_fin');
-            $table->boolean('is_presented')->default(false);
+            $table->boolean('is_present')->nullable();
 
-            $table->uuid('cu_id');
-            $table->foreign('cu_id')
+            $table->uuid('jeune_id');
+            $table->foreign('jeune_id')
                 ->references('id')
-                ->on('c_u_s')
+                ->on('jeunes')
+                ->onDelete('cascade');
+
+            $table->uuid('reunion_id');
+            $table->foreign('reunion_id')
+                ->references('id')
+                ->on('reunions')
                 ->onDelete('cascade');
 
             $table->timestamps();
@@ -33,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('reunions');
+        Schema::dropIfExists('presences');
     }
 };

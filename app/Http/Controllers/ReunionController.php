@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CU;
+use App\Models\Presence;
 use App\Models\Reunion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -11,7 +12,7 @@ use Carbon\Carbon;
 class ReunionController extends Controller
 {
     // Ajouter une réunion
-    public function createReunion(Request $request)
+    public function createReunion (Request $request)
     {
         $validator = Validator::make($request->all(), [
             'date_reunion' => 'required|date',
@@ -76,7 +77,7 @@ class ReunionController extends Controller
     }
 
     // Lister toutes les réunions
-    public function readReunions(Request $request)
+    public function readReunions (Request $request)
     {
         try {
             $user = $request->user();
@@ -104,7 +105,48 @@ class ReunionController extends Controller
                 'message' => 'Erreur lors du chargement des réunions',
                 'erreur' => $e->getMessage()
             ], 500);
+        }
+    }
 
+    public function getReunionById ($id) {
+        try {
+            $reunion = Reunion::find($id);
+            if (!$reunion) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cette réunion n’existe pas',
+                ], 404);
+            }
+
+            $presences = Presence::where('reunion_id', $reunion->id)->get();
+            $data = $presences->map(function($presence) {
+                return [
+                    'id' => $presence->id,
+                    'nom' => $presence->jeune->nom,
+                    'age' => $presence->jeune->age,
+                    'photo' => $presence->jeune->photo
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $reunion->id,
+                    'date_reunion' => $reunion->date_reunion,
+                    'heure_debut' => $reunion->heure_debut,
+                    'heure_fin' => $reunion->heure_fin,
+                    'is_presented' => $reunion->is_presented,
+                    'cu_id' => $reunion->cu_id,
+                    'presence' => $data
+                ],
+                'message' => 'Réunion affichée avec succès'
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du chargement de la réunion',
+                'erreur' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -171,7 +213,7 @@ class ReunionController extends Controller
     }
 
     // Supprimer une réunion
-    public function deleteReunion($id)
+    public function deleteReunion ($id)
     {
         try {
 

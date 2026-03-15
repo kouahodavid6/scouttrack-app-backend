@@ -6,14 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
-class Reunion extends Model
+class Presence extends Model
 {
     protected $fillable = [
-        'date_reunion',
-        'heure_debut',
-        'heure_fin',
-        'is_presented',
-        'cu_id'
+        'is_present',
+        'jeune_id',
+        'reunion_id'
     ];
 
     protected $keyType = 'string';
@@ -30,9 +28,15 @@ class Reunion extends Model
         });
     }
 
-    // Relation avec le CU
-    public function cu(): BelongsTo
+    // Relation avec jeune
+    public function jeune(): BelongsTo
     {
-        return $this->belongsTo(CU::class);
+        return $this->belongsTo(Jeune::class);
+    }
+
+    // Relation avec reunion
+    public function reunion(): BelongsTo
+    {
+        return $this->belongsTo(Reunion::class);
     }
 }
