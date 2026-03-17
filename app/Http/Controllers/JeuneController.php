@@ -71,7 +71,7 @@ class JeuneController extends Controller
         $age = $dateNaissance->age;
 
         // Vérifier que l'âge correspond à la branche
-        $branche = Branche::withTrashed()->find($request->branche_id);
+        $branche = Branche::find($request->branche_id);
         if (!$branche) {
             return response()->json([
                 'success' => false,
