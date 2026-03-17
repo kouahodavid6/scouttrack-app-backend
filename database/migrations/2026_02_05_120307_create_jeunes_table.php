@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
 
             $table->string('nom')->nullable();
-            $table->integer('age');
+            $table->date('date_naissance');
             $table->string('tel')->unique()->nullable();
             $table->string('photo')->nullable();
 

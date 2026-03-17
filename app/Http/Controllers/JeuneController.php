@@ -8,6 +8,7 @@ use App\Models\CU;
 use App\Models\Jeune;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -46,11 +47,11 @@ class JeuneController extends Controller
     }
 
 
-    // Ajouter un chef d'unité
+    // Ajouter un jeune
     public function createJeune (Request $request) {
         $validator = Validator::make($request->all(), [
             'nom' => 'required|string|max:255',
-            'age' => 'required|integer|min:4|max:21',
+            'date_naissance' => 'required|date|before:today',
             'tel' => 'required|digits:10|unique:jeunes,tel',
             'email' => 'required|email|unique:jeunes,email',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -65,12 +66,24 @@ class JeuneController extends Controller
             ], 422);
         }
 
-        $branche = Branche::find($request->branche_id);
+        // Calculer l'âge à partir de la date de naissance
+        $dateNaissance = Carbon::parse($request->date_naissance);
+        $age = $dateNaissance->age;
+
+        // Vérifier que l'âge correspond à la branche
+        $branche = Branche::withTrashed()->find($request->branche_id);
         if (!$branche) {
             return response()->json([
                 'success' => false,
                 'message' => 'Branche introuvable'
             ], 404);
+        }
+
+        if ($age < $branche->age_min || $age > $branche->age_max) {
+            return response()->json([
+                'success' => false,
+                'message' => "L'âge ($age ans) ne correspond pas à la branche {$branche->nomBranche} ({$branche->age_min}-{$branche->age_max} ans)"
+            ], 422);
         }
 
         // Générer le mot de passe
@@ -95,7 +108,7 @@ class JeuneController extends Controller
 
             $jeune = new Jeune();
             $jeune->nom = $request->nom;
-            $jeune->age = $request->age;
+            $jeune->date_naissance = $request->date_naissance;
             $jeune->tel = $request->tel;
             $jeune->email = $request->email;
             $jeune->photo = $image;
@@ -113,6 +126,9 @@ class JeuneController extends Controller
                 "compte Jeune"  // Type d'entité
             ));
 
+            // Charger les relations pour la réponse
+            $jeune->load('branche');
+
             return response()->json([
                 'success' => true,
                 'data' => $jeune,
@@ -128,47 +144,117 @@ class JeuneController extends Controller
     }
 
 
-    // Lister tous les chefs d'unités
-    public function readJeunes () {
+    // Lister tous les jeunes
+    public function readJeunes (Request $request) {
         try {
-            $cus = Jeune::with('branche')->get();
+            // Récupération de l'utilisateur connecté
+            $user = $request->user();
+            
+            // Vérification de l'authentification
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Non authentifié'
+                ], 401);
+            }
+
+            // Vérification que l'utilisateur est bien un chef d'unité
+            // Note: Le middleware auth:cu garantit déjà que c'est un CU, mais on vérifie quand même
+            $cu = CU::find($user->id);
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non autorisé - doit être un chef d\'unité'
+                ], 403);
+            }
+
+            // Récupération des jeunes appartenant à ce CU
+            $jeunes = Jeune::with(['branche', 'cu'])
+                ->where('cu_id', $user->id) // Filtre essentiel pour la sécurité
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Transformation des données
+            $jeunesFormatted = $jeunes->map(function($jeune) {
+                return [
+                    'id' => $jeune->id,
+                    'nom' => $jeune->nom,
+                    'date_naissance' => $jeune->date_naissance->format('Y-m-d'),
+                    'age' => $jeune->age,
+                    'tel' => $jeune->tel,
+                    'email' => $jeune->email,
+                    'photo' => $jeune->photo,
+                    'branche' => $jeune->branche,
+                    'cu' => $jeune->cu,
+                    'created_at' => $jeune->created_at,
+                    'updated_at' => $jeune->updated_at
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $cus,
-                'message' => 'Liste des jeunes affichée avec succès'
+                'data' => $jeunesFormatted,
+                'count' => $jeunesFormatted->count(),
+                'message' => 'Liste des jeunes récupérée avec succès'
             ], 200);
+
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors du chargement des jeunes',
                 'erreur' => $e->getMessage()
             ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur inattendue: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    // Supprimer un chef d'unité
-    public function deleteJeune ($id) {
+    // Supprimer un jeunes
+    public function deleteJeune (Request $request, $id) {
         try {
-            $jeune = Jeune::find($id);
+            // Récupération de l'utilisateur connecté
+            $user = $request->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Non authentifié'
+                ], 401);
+            }
+
+            // Recherche du jeune avec vérification d'appartenance
+            $jeune = Jeune::where('id', $id)
+                ->where('cu_id', $user->id) // ← Vérification cruciale
+                ->first();
 
             if (!$jeune) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Le jeune que vous voulez supprimer n’existe pas'
+                    'message' => 'Le jeune que vous voulez supprimer n\'existe pas ou ne vous appartient pas'
                 ], 404);
             }
+
+            // Suppression du jeune
             $jeune->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Jeune supprimé avec succès'
             ], 200);
+
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression du jeune',
                 'erreur' => $e->getMessage()
+            ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur inattendue: ' . $e->getMessage()
             ], 500);
         }
     }

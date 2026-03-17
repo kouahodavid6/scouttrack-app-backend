@@ -1,4 +1,5 @@
 <?php
+// app/Models/Jeune.php
 
 namespace App\Models;
 
@@ -7,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\HasApiTokens;
+use Carbon\Carbon;
 
 class Jeune extends Model
 {
@@ -14,7 +16,7 @@ class Jeune extends Model
 
     protected $fillable = [
         'nom',
-        'age',
+        'date_naissance',
         'tel',
         'photo',
         'email',
@@ -28,6 +30,12 @@ class Jeune extends Model
         'password',
         'remember_token',
     ];
+
+    protected $casts = [
+        'date_naissance' => 'date',
+    ];
+
+    protected $appends = ['age']; // Pour avoir age comme attribut calculé
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -43,7 +51,13 @@ class Jeune extends Model
         });
     }
 
-    // Relation avec le CU
+    // Accesseur pour l'âge (calculé automatiquement depuis date_naissance)
+    public function getAgeAttribute()
+    {
+        return $this->date_naissance ? Carbon::parse($this->date_naissance)->age : null;
+    }
+
+    // Relations
     public function cu(): BelongsTo
     {
         return $this->belongsTo(CU::class);

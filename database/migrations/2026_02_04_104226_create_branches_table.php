@@ -15,6 +15,8 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('nomBranche');
             $table->integer('ordreBranche')->default(0);
+            $table->integer('age_min')->nullable();
+            $table->integer('age_max')->nullable();
             $table->timestamps();
         });
     }
