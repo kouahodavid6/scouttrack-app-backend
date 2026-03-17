@@ -72,8 +72,8 @@ class BrancheController extends Controller
     // Modifier une branche
     public function updateBranche (Request $request, $id) {
         $validator = Validator::make($request->all(), [
-            'nomBranche' => 'required|string|max:255|unique:branches,nomBranche',
-            'ordreBranche' => 'required|integer|min:1|unique:branches,ordreBranche',
+            'nomBranche' => 'required|string|max:255|unique:branches,nomBranche,' . $id . ',id',
+            'ordreBranche' => 'required|integer|min:1|unique:branches,ordreBranche,' . $id . ',id',
             'age_min' => 'required|integer|min:4|max:20',
             'age_max' => 'required|integer|min:5|max:21|gt:age_min'
         ]);
@@ -92,14 +92,14 @@ class BrancheController extends Controller
             if (!$branche) {
                 return response()->json([
                     'success' => false,
-                    'message' =>'Cette branche n’existe pas'
+                    'message' => 'Cette branche n’existe pas'
                 ], 404);
             }
             
-            $branche->nomBranche = $request->nomBranche ?? $branche->nomBranche;
-            $branche->ordreBranche = $request->ordreBranche ?? $branche->ordreBranche;
-            $branche->age_min = $request->age_min ?? $branche->age_min;
-            $branche->age_max = $request->age_max ?? $branche->age_max;
+            $branche->nomBranche = $request->nomBranche;
+            $branche->ordreBranche = $request->ordreBranche;
+            $branche->age_min = $request->age_min;
+            $branche->age_max = $request->age_max;
             $branche->save();
 
             return response()->json([
@@ -107,6 +107,7 @@ class BrancheController extends Controller
                 'data' => $branche,
                 'message' => 'Branche modifiée avec succès'
             ], 200);
+            
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
