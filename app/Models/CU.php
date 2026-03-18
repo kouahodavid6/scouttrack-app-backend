@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Str;
 
-class CU extends Model
+class CU extends Authenticatable
 {
-    use HasFactory, HasApiTokens;
+    use HasApiTokens, HasFactory;
 
+    protected $table = 'c_u_s';
+    
     protected $fillable = [
         'nom',
         'tel',
@@ -37,26 +37,19 @@ class CU extends Model
         parent::boot();
 
         static::creating(function ($model) {
-            if (!$model->getKey()) {
+            if (empty($model->{$model->getKeyName()})) {
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
     }
 
-    // Relation avec le groupe
-    public function groupe(): BelongsTo
+    public function reunions()
     {
-        return $this->belongsTo(Groupe::class);
+        return $this->hasMany(Reunion::class, 'cu_id');
     }
 
-    // Relation avec les jeunes
-    public function jeunes(): HasMany
+    public function jeunes()
     {
-        return $this->hasMany(Jeune::class);
-    }
-
-    public function branche(): BelongsTo
-    {
-        return $this->belongsTo(Branche::class);
+        return $this->hasMany(Jeune::class, 'cu_id');
     }
 }

@@ -41,54 +41,68 @@ class ReunionController extends Controller
         }
 
         try {
-            $user = $request->user();
-            $cu   = CU::find($user->id);
+            // L'utilisateur authentifié EST DÉJÀ un CU
+            $cu = $request->user();
 
             if (!$cu) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Chef d'unité introuvable"
-                ], 404);
+                    'message' => "Chef d'unité non authentifié"
+                ], 401);
             }
 
-            $reunion               = new Reunion();
+            // Vérifier que c'est bien un CU (role = 1)
+            if ($cu->role !== 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Utilisateur non autorisé"
+                ], 403);
+            }
+
+            $reunion = new Reunion();
             $reunion->date_reunion = $request->date_reunion;
-            $reunion->heure_debut  = $request->heure_debut;
-            $reunion->heure_fin    = $request->heure_fin;
-            $reunion->cu_id        = $cu->id;
+            $reunion->heure_debut = $request->heure_debut;
+            $reunion->heure_fin = $request->heure_fin;
+            $reunion->cu_id = $cu->id; // Utilise directement l'ID du CU connecté
             $reunion->is_presented = false;
             $reunion->save();
 
             return response()->json([
                 'success' => true,
-                'data'    => $reunion,
+                'data' => $reunion,
                 'message' => 'Réunion créée avec succès'
             ], 201);
 
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création de la réunion',
-                'error'   => $e->getMessage()
+                'message' => 'Erreur lors de la création de la réunion'
             ], 500);
         }
     }
 
     /**
      * Lister toutes les réunions du CU connecté
-     * Retourne la clé "presences" (pluriel) dans chaque réunion.
      */
     public function readReunions(Request $request)
     {
         try {
-            $user = $request->user();
-            $cu   = CU::find($user->id);
+            // L'utilisateur authentifié EST DÉJÀ un CU
+            $cu = $request->user();
 
             if (!$cu) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Chef d'unité introuvable"
-                ], 404);
+                    'message' => "Chef d'unité non authentifié"
+                ], 401);
+            }
+
+            // Vérifier que c'est bien un CU (role = 1)
+            if ($cu->role !== 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Utilisateur non autorisé"
+                ], 403);
             }
 
             $reunions = Reunion::with('presences.jeune')
@@ -99,57 +113,68 @@ class ReunionController extends Controller
             $formattedReunions = [];
 
             foreach ($reunions as $reunion) {
-                $formattedReunion = [
-                    'id'           => $reunion->id,
-                    'date_reunion' => $reunion->date_reunion,
-                    'heure_debut'  => $reunion->heure_debut,
-                    'heure_fin'    => $reunion->heure_fin,
-                    'is_presented' => $reunion->is_presented,
-                    'cu_id'        => $reunion->cu_id,
-                    'created_at'   => $reunion->created_at,
-                    'updated_at'   => $reunion->updated_at,
-                    'presences'    => []   // ← clé "presences" (pluriel)
-                ];
-
+                $presences = [];
+                
                 if ($reunion->presences && $reunion->presences->count() > 0) {
-                    $formattedReunion['presences'] = $reunion->presences->map(function ($presence) {
-                        return [
-                            'id'      => $presence->jeune_id,
-                            'nom'     => $presence->jeune->nom,
-                            'age'     => $presence->jeune->age,
-                            'photo'   => $presence->jeune->photo,
-                            'branche' => $presence->jeune->branche
-                        ];
-                    })->toArray();
+                    $presences = $reunion->presences->map(function ($presence) {
+                        if ($presence->jeune) {
+                            return [
+                                'id' => $presence->jeune->id,
+                                'nom' => $presence->jeune->nom,
+                                'age' => $presence->jeune->age,
+                                'photo' => $presence->jeune->photo,
+                                'branche' => $presence->jeune->branche
+                            ];
+                        }
+                        return null;
+                    })->filter()->values()->toArray();
                 }
 
-                $formattedReunions[] = $formattedReunion;
+                $formattedReunions[] = [
+                    'id' => $reunion->id,
+                    'date_reunion' => $reunion->date_reunion,
+                    'heure_debut' => $reunion->heure_debut,
+                    'heure_fin' => $reunion->heure_fin,
+                    'is_presented' => $reunion->is_presented,
+                    'cu_id' => $reunion->cu_id,
+                    'created_at' => $reunion->created_at,
+                    'updated_at' => $reunion->updated_at,
+                    'presences' => $presences
+                ];
             }
 
             return response()->json([
                 'success' => true,
-                'data'    => $formattedReunions,
+                'data' => $formattedReunions,
                 'message' => 'Liste des réunions récupérée avec succès',
             ], 200);
 
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors du chargement des réunions',
-                'error'   => $e->getMessage()
+                'message' => 'Erreur lors du chargement des réunions'
             ], 500);
         }
     }
 
     /**
      * Récupérer une réunion avec ses présences
-     * ✅ CORRECTION : clé "presences" (pluriel) — alignée avec readReunions
-     *    et avec HistoriquePresenceModal qui lit reunion?.presences
      */
-    public function getReunionById($id)
+    public function getReunionById(Request $request, $id)
     {
         try {
-            $reunion = Reunion::with('presences.jeune')->find($id);
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Chef d'unité non authentifié"
+                ], 401);
+            }
+
+            $reunion = Reunion::with('presences.jeune')
+                ->where('cu_id', $cu->id)
+                ->find($id);
 
             if (!$reunion) {
                 return response()->json([
@@ -158,27 +183,34 @@ class ReunionController extends Controller
                 ], 404);
             }
 
-            return response()->json([
-                'success' => true,
-                'data'    => [
-                    'id'           => $reunion->id,
-                    'date_reunion' => $reunion->date_reunion,
-                    'heure_debut'  => $reunion->heure_debut,
-                    'heure_fin'    => $reunion->heure_fin,
-                    'is_presented' => $reunion->is_presented,
-                    'cu_id'        => $reunion->cu_id,
-                    'created_at'   => $reunion->created_at,
-                    'updated_at'   => $reunion->updated_at,
-                    // ✅ "presences" (pluriel) — cohérent avec readReunions et le frontend
-                    'presences'    => $reunion->presences->map(function ($presence) {
+            $presences = [];
+            if ($reunion->presences && $reunion->presences->count() > 0) {
+                $presences = $reunion->presences->map(function ($presence) {
+                    if ($presence->jeune) {
                         return [
-                            'id'      => $presence->jeune_id,
-                            'nom'     => $presence->jeune->nom,
-                            'age'     => $presence->jeune->age,
-                            'photo'   => $presence->jeune->photo,
+                            'id' => $presence->jeune->id,
+                            'nom' => $presence->jeune->nom,
+                            'age' => $presence->jeune->age,
+                            'photo' => $presence->jeune->photo,
                             'branche' => $presence->jeune->branche
                         ];
-                    })
+                    }
+                    return null;
+                })->filter()->values();
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $reunion->id,
+                    'date_reunion' => $reunion->date_reunion,
+                    'heure_debut' => $reunion->heure_debut,
+                    'heure_fin' => $reunion->heure_fin,
+                    'is_presented' => $reunion->is_presented,
+                    'cu_id' => $reunion->cu_id,
+                    'created_at' => $reunion->created_at,
+                    'updated_at' => $reunion->updated_at,
+                    'presences' => $presences
                 ],
                 'message' => 'Réunion récupérée avec succès'
             ], 200);
@@ -186,8 +218,7 @@ class ReunionController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors du chargement de la réunion',
-                'error'   => $e->getMessage()
+                'message' => 'Erreur lors du chargement de la réunion'
             ], 500);
         }
     }
@@ -199,8 +230,8 @@ class ReunionController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'date_reunion' => 'required|date',
-            'heure_debut'  => 'required|date_format:H:i',
-            'heure_fin'    => 'required|date_format:H:i|after:heure_debut'
+            'heure_debut' => 'required|date_format:H:i',
+            'heure_fin' => 'required|date_format:H:i|after:heure_debut'
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -221,7 +252,16 @@ class ReunionController extends Controller
         }
 
         try {
-            $reunion = Reunion::find($id);
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Chef d'unité non authentifié"
+                ], 401);
+            }
+
+            $reunion = Reunion::where('cu_id', $cu->id)->find($id);
 
             if (!$reunion) {
                 return response()->json([
@@ -238,21 +278,20 @@ class ReunionController extends Controller
             }
 
             $reunion->date_reunion = $request->date_reunion;
-            $reunion->heure_debut  = $request->heure_debut;
-            $reunion->heure_fin    = $request->heure_fin;
+            $reunion->heure_debut = $request->heure_debut;
+            $reunion->heure_fin = $request->heure_fin;
             $reunion->save();
 
             return response()->json([
                 'success' => true,
-                'data'    => $reunion,
+                'data' => $reunion,
                 'message' => 'Réunion modifiée avec succès'
             ], 200);
 
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la modification de la réunion',
-                'error'   => $e->getMessage()
+                'message' => 'Erreur lors de la modification de la réunion'
             ], 500);
         }
     }
@@ -260,10 +299,19 @@ class ReunionController extends Controller
     /**
      * Supprimer une réunion
      */
-    public function deleteReunion($id)
+    public function deleteReunion(Request $request, $id)
     {
         try {
-            $reunion = Reunion::find($id);
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Chef d'unité non authentifié"
+                ], 401);
+            }
+
+            $reunion = Reunion::where('cu_id', $cu->id)->find($id);
 
             if (!$reunion) {
                 return response()->json([
@@ -272,7 +320,10 @@ class ReunionController extends Controller
                 ], 404);
             }
 
+            // Supprimer d'abord les présences associées
             Presence::where('reunion_id', $id)->delete();
+            
+            // Puis supprimer la réunion
             $reunion->delete();
 
             return response()->json([
@@ -283,8 +334,7 @@ class ReunionController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la suppression de la réunion',
-                'error'   => $e->getMessage()
+                'message' => 'Erreur lors de la suppression de la réunion'
             ], 500);
         }
     }
