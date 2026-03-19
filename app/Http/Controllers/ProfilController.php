@@ -15,13 +15,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rules\Password;
 
-class ProfileController extends Controller
+class ProfilController extends Controller
 {
     /**
      * Récupérer le profil de l'utilisateur connecté
-     * GET /api/profile
+     * GET /api/profil
      */
-    public function getProfile(Request $request)
+    public function getProfil(Request $request)
     {
         try {
             $user = $request->user();
@@ -39,7 +39,7 @@ class ProfileController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error('Erreur getProfile: ' . $e->getMessage());
+            Log::error('Erreur getProfil: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération du profil'
@@ -49,9 +49,9 @@ class ProfileController extends Controller
 
     /**
      * Mettre à jour le profil
-     * POST /api/profile/update
+     * POST /api/profil/update
      */
-    public function updateProfile(Request $request)
+    public function updateProfil(Request $request)
     {
         try {
             $user = $request->user();
@@ -105,7 +105,7 @@ class ProfileController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error('Erreur updateProfile: ' . $e->getMessage());
+            Log::error('Erreur updateProfil: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la mise à jour du profil: ' . $e->getMessage()
@@ -115,7 +115,7 @@ class ProfileController extends Controller
 
     /**
      * Changer le mot de passe
-     * POST /api/profile/change-password
+     * POST /api/profil/change-password
      */
     public function changePassword(Request $request)
     {
