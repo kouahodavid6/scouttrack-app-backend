@@ -11,6 +11,7 @@ use App\Http\Controllers\EtapeController;
 use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
 use App\Http\Controllers\PresenceController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReunionController;
 use App\Http\Controllers\SuiviJeuneController;
 use Illuminate\Support\Facades\Route;
@@ -103,4 +104,12 @@ Route::middleware('auth:jeune')->group(function() {
     // Consultation de la progression (lecture seule)
     Route::get('/mon-suivi', [JeuneProgressionController::class, 'getMaProgression']);
     Route::get('/mes-statistiques', [JeuneProgressionController::class, 'getMesStatistiques']);
+});
+
+// ==================== ROUTES COMMUNES POUR TOUS LES UTILISATEURS AUTHENTIFIÉS ====================
+Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(function() {
+    // Routes de profil - TOUS LES UTILISATEURS ONT ACCÈS
+    Route::get('/profile', [ProfileController::class, 'getProfile']);
+    Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
+    Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
 });
