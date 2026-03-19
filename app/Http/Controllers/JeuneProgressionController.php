@@ -61,7 +61,7 @@ class JeuneProgressionController extends Controller
                 'photo' => $jeune->photo,
                 'branche' => [
                     'id' => $jeune->branche->id,
-                    'nom' => $jeune->branche->nomBranche,
+                    'nomBranche' => $jeune->branche->nomBranche,
                     'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
                 ],
                 'etapes' => []
@@ -161,7 +161,7 @@ class JeuneProgressionController extends Controller
                     'pourcentage_progression' => $pourcentage . '%',
                     'branche' => [
                         'id' => $jeune->branche->id,
-                        'nom' => $jeune->branche->nomBranche,
+                        'nomBranche' => $jeune->branche->nomBranche,
                         'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
                     ],
                     'etapes' => $jeune->branche->etapes->map(function($etape) use ($jeune) {

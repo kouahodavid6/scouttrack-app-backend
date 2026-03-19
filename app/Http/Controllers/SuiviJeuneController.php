@@ -9,6 +9,7 @@ use App\Models\Activite;
 use App\Models\Etape;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class SuiviJeuneController extends Controller
 {
@@ -57,11 +58,12 @@ class SuiviJeuneController extends Controller
                 'data' => $jeunes,
                 'message' => 'Jeunes récupérés avec succès'
             ], 200);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération des jeunes',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -84,9 +86,7 @@ class SuiviJeuneController extends Controller
             }
 
             // Vérifier que le jeune appartient au chef
-            $jeune = Jeune::with(['branche' => function ($query) {
-                $query->orderBy('ordreBranche');
-            }])
+            $jeune = Jeune::with(['branche'])
                 ->where('id', $id)
                 ->where('cu_id', $chef->id)
                 ->first();
@@ -105,10 +105,8 @@ class SuiviJeuneController extends Controller
                 ], 400);
             }
 
-            // Récupérer toutes les étapes de la branche avec leurs activités
-            $etapes = Etape::with(['activites' => function ($query) {
-                $query->orderBy('nom_act');
-            }])
+            // Récupérer toutes les étapes de la branche avec leurs activités (SANS .badge)
+            $etapes = Etape::with(['activites']) // ← MODIFICATION ICI
                 ->where('branche_id', $jeune->branche_id)
                 ->orderBy('numEtape')
                 ->get();
@@ -136,7 +134,7 @@ class SuiviJeuneController extends Controller
                     'date_naissance' => $jeune->date_naissance,
                     'branche' => [
                         'id' => $jeune->branche->id,
-                        'nom' => $jeune->branche->nomBranche,
+                        'nomBranche' => $jeune->branche->nomBranche,
                         'ordreBranche' => $jeune->branche->ordreBranche,
                         'age_min' => $jeune->branche->age_min,
                         'age_max' => $jeune->branche->age_max
@@ -174,16 +172,22 @@ class SuiviJeuneController extends Controller
                         $activitesValideesEtape++;
                     }
 
+                    // MODIFICATION : badge est maintenant une simple chaîne (URL)
+                    $badgeData = null;
+                    if ($activite->badge) {
+                        $badgeData = [
+                            'id' => $activite->id, // Utiliser l'ID de l'activité
+                            'nom' => 'Badge ' . $activite->nom_act, // Nom générique
+                            'image' => $activite->badge, // ← C'est l'URL stockée
+                            'description' => $activite->description
+                        ];
+                    }
+
                     $etapeData['activites'][] = [
                         'id' => $activite->id,
                         'nom_act' => $activite->nom_act,
                         'description' => $activite->description,
-                        'badge' => $activite->badge ? [
-                            'id' => $activite->badge->id,
-                            'nom' => $activite->badge->nom,
-                            'image' => $activite->badge->image,
-                            'description' => $activite->badge->description
-                        ] : null,
+                        'badge' => $badgeData,
                         'date_debut' => $activite->date_debut,
                         'date_fin' => $activite->date_fin,
                         'is_participated' => $isParticipated,
@@ -207,11 +211,12 @@ class SuiviJeuneController extends Controller
                 'data' => $resultat,
                 'message' => 'Suivi du jeune récupéré avec succès'
             ], 200);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération du suivi',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -233,9 +238,7 @@ class SuiviJeuneController extends Controller
                 ], 404);
             }
 
-            $jeunes = Jeune::with(['branche' => function ($query) {
-                $query->orderBy('ordreBranche');
-            }])
+            $jeunes = Jeune::with(['branche'])
                 ->where('cu_id', $chef->id)
                 ->orderBy('nom')
                 ->get();
@@ -264,7 +267,7 @@ class SuiviJeuneController extends Controller
                     'photo' => $jeune->photo,
                     'branche' => [
                         'id' => $jeune->branche->id,
-                        'nom' => $jeune->branche->nomBranche,
+                        'nomBranche' => $jeune->branche->nomBranche,
                         'ordreBranche' => $jeune->branche->ordreBranche
                     ],
                     'statistiques' => [
@@ -280,11 +283,12 @@ class SuiviJeuneController extends Controller
                 'data' => $resultat,
                 'message' => 'Suivi des jeunes récupéré avec succès'
             ], 200);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération du suivi',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -314,7 +318,7 @@ class SuiviJeuneController extends Controller
             if (!$chef) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Chef d’unité introuvable'
+                    'message' => 'Chef d\'unité introuvable'
                 ], 404);
             }
 
@@ -357,11 +361,12 @@ class SuiviJeuneController extends Controller
                 ],
                 'message' => 'Participation validée avec succès'
             ], 201);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la validation de la participation',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -379,7 +384,7 @@ class SuiviJeuneController extends Controller
             if (!$chef) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Chef d’unité introuvable'
+                    'message' => 'Chef d\'unité introuvable'
                 ], 404);
             }
 
@@ -406,11 +411,12 @@ class SuiviJeuneController extends Controller
                 'success' => true,
                 'message' => 'Participation supprimée avec succès'
             ], 200);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression de la participation',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -436,6 +442,13 @@ class SuiviJeuneController extends Controller
         try {
             $user = $request->user();
             $chef = CU::find($user->id);
+
+            if (!$chef) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Chef d\'unité introuvable'
+                ], 404);
+            }
 
             $jeune = Jeune::where('id', $request->jeune_id)
                 ->where('cu_id', $chef->id)
@@ -468,11 +481,12 @@ class SuiviJeuneController extends Controller
                 ],
                 'message' => $estComplete ? 'Toutes les activités sont validées' : 'Il reste des activités à valider'
             ], 200);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la vérification',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -486,6 +500,13 @@ class SuiviJeuneController extends Controller
         try {
             $user = $request->user();
             $chef = CU::find($user->id);
+
+            if (!$chef) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Chef d\'unité introuvable'
+                ], 404);
+            }
 
             $jeune = Jeune::with(['branche'])
                 ->where('id', $id)
@@ -536,7 +557,7 @@ class SuiviJeuneController extends Controller
                     ],
                     'branche' => [
                         'id' => $jeune->branche->id,
-                        'nom' => $jeune->branche->nomBranche,
+                        'nomBranche' => $jeune->branche->nomBranche,
                         'ordreBranche' => $jeune->branche->ordreBranche
                     ],
                     'statistiques' => [
@@ -547,11 +568,12 @@ class SuiviJeuneController extends Controller
                 ],
                 'message' => 'Statistiques récupérées avec succès'
             ], 200);
-        } catch (\Throwable $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération des statistiques',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
