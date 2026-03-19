@@ -86,6 +86,7 @@ Route::middleware('auth:cu')->group(function() {
     Route::post('/suivi/valider', [SuiviJeuneController::class, 'validerParticipation']);
     Route::delete('/suivi/invalider/{participation_id}', [SuiviJeuneController::class, 'supprimerParticipation']);
     Route::get('/suivi/etape-complete', [SuiviJeuneController::class, 'checkEtapeComplete']);
+    Route::get('/suivi/jeune/{id}', [SuiviJeuneController::class, 'getSuiviJeune']);
     Route::get('/suivi/jeune/{id}/statistiques', [SuiviJeuneController::class, 'getStatistiquesJeune']);
 
     // Routes pour les réunions et présences

@@ -6,6 +6,7 @@ use App\Models\Act_Jeune;
 use App\Models\CU;
 use App\Models\Jeune;
 use App\Models\Activite;
+use App\Models\Etape;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -15,35 +16,47 @@ class SuiviJeuneController extends Controller
      * RÉCUPÉRER LES JEUNES DU CHEF D'UNITÉ CONNECTÉ
      * Endpoint: GET /api/chef/mes-jeunes
      */
-    public function getMesJeunes (Request $request) {
+    public function getMesJeunes(Request $request)
+    {
         try {
-            // Récupérer l'utilisateur connecté (qui est un chef d'unité)
             $user = $request->user();
-            
-            // Trouver le chef d'unité correspondant
             $chef = CU::find($user->id);
-            
+
             if (!$chef) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Chef d\'unité introuvable'
                 ], 404);
             }
-            
-            // Récupérer tous les jeunes de ce chef avec leur branche (triée par ordre)
-            $jeunes = Jeune::with(['branche' => function($query) {
+
+            $jeunes = Jeune::with(['branche' => function ($query) {
                 $query->orderBy('ordreBranche');
             }])
                 ->where('cu_id', $chef->id)
                 ->orderBy('nom')
-                ->get();
-            
+                ->get()
+                ->map(function ($jeune) {
+                    return [
+                        'id' => $jeune->id,
+                        'nom' => $jeune->nom,
+                        'age' => $jeune->age,
+                        'photo' => $jeune->photo,
+                        'email' => $jeune->email,
+                        'tel' => $jeune->tel,
+                        'date_naissance' => $jeune->date_naissance,
+                        'branche' => $jeune->branche ? [
+                            'id' => $jeune->branche->id,
+                            'nomBranche' => $jeune->branche->nomBranche,
+                            'ordreBranche' => $jeune->branche->ordreBranche
+                        ] : null
+                    ];
+                });
+
             return response()->json([
                 'success' => true,
                 'data' => $jeunes,
                 'message' => 'Jeunes récupérés avec succès'
             ], 200);
-            
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -54,57 +67,197 @@ class SuiviJeuneController extends Controller
     }
 
     /**
-     * SUIVI COMPLET : ACTIVITÉS PAR ÉTAPE AVEC STATUT DE PARTICIPATION
-     * Endpoint: GET /api/suivi/jeunes
+     * SUIVI COMPLET D'UN JEUNE SPÉCIFIQUE
+     * Endpoint: GET /api/suivi/jeune/{id}
      */
-    public function getSuiviComplet (Request $request) {
+    public function getSuiviJeune(Request $request, $id)
+    {
         try {
-            // 1. Récupérer le chef connecté
             $user = $request->user();
             $chef = CU::find($user->id);
-            
+
             if (!$chef) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Chef d\'unité introuvable'
                 ], 404);
             }
-            
-            // 2. Récupérer tous les jeunes du chef avec leurs relations (triées)
-            $jeunes = Jeune::with([
-                'branche' => function($query) {
-                    $query->orderBy('ordreBranche');
-                }, 
-                'branche.etapes' => function($query) {
-                    $query->orderBy('numEtape');
-                }, 
-                'branche.etapes.activites'
-            ])
+
+            // Vérifier que le jeune appartient au chef
+            $jeune = Jeune::with(['branche' => function ($query) {
+                $query->orderBy('ordreBranche');
+            }])
+                ->where('id', $id)
+                ->where('cu_id', $chef->id)
+                ->first();
+
+            if (!$jeune) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jeune introuvable ou ne vous appartient pas'
+                ], 404);
+            }
+
+            if (!$jeune->branche) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce jeune n\'a pas de branche assignée'
+                ], 400);
+            }
+
+            // Récupérer toutes les étapes de la branche avec leurs activités
+            $etapes = Etape::with(['activites' => function ($query) {
+                $query->orderBy('nom_act');
+            }])
+                ->where('branche_id', $jeune->branche_id)
+                ->orderBy('numEtape')
+                ->get();
+
+            // Récupérer les participations du jeune
+            $participations = Act_Jeune::where('jeune_id', $jeune->id)->get();
+            $participationMap = [];
+            foreach ($participations as $p) {
+                $participationMap[$p->activite_id] = [
+                    'id' => $p->id,
+                    'statut' => $p->statut,
+                    'created_at' => $p->created_at
+                ];
+            }
+
+            // Construire la réponse
+            $resultat = [
+                'jeune' => [
+                    'id' => $jeune->id,
+                    'nom' => $jeune->nom,
+                    'age' => $jeune->age,
+                    'photo' => $jeune->photo,
+                    'email' => $jeune->email,
+                    'tel' => $jeune->tel,
+                    'date_naissance' => $jeune->date_naissance,
+                    'branche' => [
+                        'id' => $jeune->branche->id,
+                        'nom' => $jeune->branche->nomBranche,
+                        'ordreBranche' => $jeune->branche->ordreBranche,
+                        'age_min' => $jeune->branche->age_min,
+                        'age_max' => $jeune->branche->age_max
+                    ]
+                ],
+                'progression' => [
+                    'total_activites' => 0,
+                    'activites_validees' => count($participations),
+                    'pourcentage' => 0
+                ],
+                'etapes' => []
+            ];
+
+            $totalActivites = 0;
+
+            foreach ($etapes as $etape) {
+                $etapeData = [
+                    'id' => $etape->id,
+                    'nom' => $etape->nom,
+                    'numEtape' => $etape->numEtape,
+                    'description' => $etape->description,
+                    'total_activites' => $etape->activites->count(),
+                    'activites_validees' => 0,
+                    'est_complete' => false,
+                    'activites' => []
+                ];
+
+                $activitesValideesEtape = 0;
+
+                foreach ($etape->activites as $activite) {
+                    $totalActivites++;
+                    $isParticipated = isset($participationMap[$activite->id]);
+
+                    if ($isParticipated) {
+                        $activitesValideesEtape++;
+                    }
+
+                    $etapeData['activites'][] = [
+                        'id' => $activite->id,
+                        'nom_act' => $activite->nom_act,
+                        'description' => $activite->description,
+                        'badge' => $activite->badge ? [
+                            'id' => $activite->badge->id,
+                            'nom' => $activite->badge->nom,
+                            'image' => $activite->badge->image,
+                            'description' => $activite->badge->description
+                        ] : null,
+                        'date_debut' => $activite->date_debut,
+                        'date_fin' => $activite->date_fin,
+                        'is_participated' => $isParticipated,
+                        'participation' => $isParticipated ? $participationMap[$activite->id] : null
+                    ];
+                }
+
+                $etapeData['activites_validees'] = $activitesValideesEtape;
+                $etapeData['est_complete'] = ($activitesValideesEtape === $etapeData['total_activites']) && $etapeData['total_activites'] > 0;
+
+                $resultat['etapes'][] = $etapeData;
+            }
+
+            $resultat['progression']['total_activites'] = $totalActivites;
+            $resultat['progression']['pourcentage'] = $totalActivites > 0
+                ? round(($resultat['progression']['activites_validees'] / $totalActivites) * 100, 2)
+                : 0;
+
+            return response()->json([
+                'success' => true,
+                'data' => $resultat,
+                'message' => 'Suivi du jeune récupéré avec succès'
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération du suivi',
+                'erreur' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * SUIVI COMPLET : TOUS LES JEUNES AVEC LEUR PROGRESSION
+     * Endpoint: GET /api/suivi/jeunes
+     */
+    public function getSuiviComplet(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $chef = CU::find($user->id);
+
+            if (!$chef) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Chef d\'unité introuvable'
+                ], 404);
+            }
+
+            $jeunes = Jeune::with(['branche' => function ($query) {
+                $query->orderBy('ordreBranche');
+            }])
                 ->where('cu_id', $chef->id)
                 ->orderBy('nom')
                 ->get();
-            
-            // 3. Récupérer toutes les participations (act_jeune) pour ces jeunes
-            $jeuneIds = $jeunes->pluck('id');
-            $participations = Act_Jeune::whereIn('jeune_id', $jeuneIds)->get();
-            
-            // 4. Construire un tableau de participation pour un accès rapide
-$participationMap = [];
-foreach ($participations as $p) {
-    $key = $p->jeune_id . '_' . $p->activite_id;
-    $participationMap[$key] = $p->id;
-}
-            
-            // 5. Construire la réponse structurée
+
             $resultat = [];
-            
+
             foreach ($jeunes as $jeune) {
-                // Sécurité : si le jeune n'a pas de branche, on l'ignore
                 if (!$jeune->branche) {
                     continue;
                 }
-                
-                $jeuneData = [
+
+                // Compter les participations
+                $participations = Act_Jeune::where('jeune_id', $jeune->id)->count();
+
+                // Compter le total d'activités dans sa branche
+                $totalActivites = Activite::whereHas('etape', function ($query) use ($jeune) {
+                    $query->where('branche_id', $jeune->branche_id);
+                })->count();
+
+                $pourcentage = $totalActivites > 0 ? round(($participations / $totalActivites) * 100, 2) : 0;
+
+                $resultat[] = [
                     'id' => $jeune->id,
                     'nom' => $jeune->nom,
                     'age' => $jeune->age,
@@ -112,53 +265,21 @@ foreach ($participations as $p) {
                     'branche' => [
                         'id' => $jeune->branche->id,
                         'nom' => $jeune->branche->nomBranche,
-                        'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
+                        'ordreBranche' => $jeune->branche->ordreBranche
                     ],
-                    'etapes' => []
+                    'statistiques' => [
+                        'total_activites' => $totalActivites,
+                        'activites_validees' => $participations,
+                        'pourcentage' => $pourcentage . '%'
+                    ]
                 ];
-                
-                // Parcourir les étapes de la branche du jeune (déjà triées par numEtape)
-                foreach ($jeune->branche->etapes as $etape) {
-                    $etapeData = [
-                        'id' => $etape->id,
-                        'nom' => $etape->nom,
-                        'numEtape' => $etape->numEtape,
-                        'activites' => []
-                    ];
-                    
-                    // Trier les activités par nom
-                    $activites = $etape->activites->sortBy('nom_act');
-                    
-                    // Parcourir les activités de l'étape
-                    foreach ($activites as $activite) {
-                        $key = $jeune->id . '_' . $activite->id;
-                        $isParticipated = isset($participationMap[$key]);
-                        
-                        $etapeData['activites'][] = [
-                            'id' => $activite->id,
-                            'nom_act' => $activite->nom_act,
-                            'description' => $activite->description,
-                            'badge' => $activite->badge,
-                            'date_debut' => $activite->date_debut,
-                            'date_fin' => $activite->date_fin,
-                            'is_participated' => $isParticipated,
-                            'participation_id' => $participationMap[$key] ?? null
-                        ];
-                    }
-                    
-                    // Ajouter toutes les étapes même celles qui n'ont pas d'activités
-                    $jeuneData['etapes'][] = $etapeData;
-                }
-                
-                $resultat[] = $jeuneData;
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $resultat,
-                'message' => 'Suivi des activités récupéré avec succès'
+                'message' => 'Suivi des jeunes récupéré avec succès'
             ], 200);
-            
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -172,7 +293,8 @@ foreach ($participations as $p) {
      * VALIDER LA PARTICIPATION D'UN JEUNE À UNE ACTIVITÉ
      * Endpoint: POST /api/suivi/valider
      */
-    public function validerParticipation (Request $request) {
+    public function validerParticipation(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'jeune_id' => 'required|uuid|exists:jeunes,id',
             'activite_id' => 'required|uuid|exists:activites,id',
@@ -186,7 +308,6 @@ foreach ($participations as $p) {
         }
 
         try {
-            // Vérifier que le jeune appartient bien au chef connecté (sécurité)
             $user = $request->user();
             $chef = CU::find($user->id);
 
@@ -196,46 +317,46 @@ foreach ($participations as $p) {
                     'message' => 'Chef d’unité introuvable'
                 ], 404);
             }
-            
+
             $jeune = Jeune::where('id', $request->jeune_id)
                 ->where('cu_id', $chef->id)
                 ->first();
-                
+
             if (!$jeune) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Ce jeune ne vous appartient pas ou n\'existe pas'
                 ], 403);
             }
-            
-            // Vérifier si la participation existe déjà
+
             $participationExistante = Act_Jeune::where('jeune_id', $request->jeune_id)
                 ->where('activite_id', $request->activite_id)
                 ->first();
-                
+
             if ($participationExistante) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Ce jeune a déjà validé cette activité'
                 ], 409);
             }
-            
-            // Créer la participation
+
             $participation = new Act_Jeune();
             $participation->jeune_id = $request->jeune_id;
             $participation->activite_id = $request->activite_id;
             $participation->statut = 'valide';
             $participation->save();
-            
-            // Charger les relations pour la réponse
-            $participation->load(['jeune', 'activite']);
-            
+
             return response()->json([
                 'success' => true,
-                'data' => $participation,
-                'message' => 'Participation validée avec succès. Le badge peut être attribué.'
+                'data' => [
+                    'id' => $participation->id,
+                    'jeune_id' => $participation->jeune_id,
+                    'activite_id' => $participation->activite_id,
+                    'statut' => $participation->statut,
+                    'created_at' => $participation->created_at
+                ],
+                'message' => 'Participation validée avec succès'
             ], 201);
-            
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -245,7 +366,12 @@ foreach ($participations as $p) {
         }
     }
 
-    public function supprimerParticipation (Request $request, $participation_id) {
+    /**
+     * SUPPRIMER UNE PARTICIPATION
+     * Endpoint: DELETE /api/suivi/invalider/{participation_id}
+     */
+    public function supprimerParticipation(Request $request, $participation_id)
+    {
         try {
             $user = $request->user();
             $chef = CU::find($user->id);
@@ -257,21 +383,29 @@ foreach ($participations as $p) {
                 ], 404);
             }
 
-            $actJeune = Act_Jeune::find($participation_id);
+            $actJeune = Act_Jeune::with('jeune')->find($participation_id);
+
             if (!$actJeune) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Participation introuvable'
                 ], 404);
             }
+
+            // Vérifier que le jeune appartient au chef
+            if ($actJeune->jeune->cu_id !== $chef->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous n\'êtes pas autorisé à supprimer cette participation'
+                ], 403);
+            }
+
             $actJeune->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'La suppression de la participation est un succès'
+                'message' => 'Participation supprimée avec succès'
             ], 200);
-
-
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -285,7 +419,8 @@ foreach ($participations as $p) {
      * VÉRIFIER SI UNE ÉTAPE EST COMPLÈTE POUR UN JEUNE
      * Endpoint: GET /api/suivi/etape-complete
      */
-    public function checkEtapeComplete (Request $request) {
+    public function checkEtapeComplete(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'jeune_id' => 'required|uuid|exists:jeunes,id',
             'etape_id' => 'required|uuid|exists:etapes,id'
@@ -299,32 +434,29 @@ foreach ($participations as $p) {
         }
 
         try {
-            // Vérifier que le jeune appartient au chef connecté
             $user = $request->user();
             $chef = CU::find($user->id);
-            
+
             $jeune = Jeune::where('id', $request->jeune_id)
                 ->where('cu_id', $chef->id)
                 ->first();
-                
+
             if (!$jeune) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Ce jeune ne vous appartient pas'
                 ], 403);
             }
-            
-            // Récupérer toutes les activités de l'étape
+
             $activites = Activite::where('etape_id', $request->etape_id)->get();
             $totalActivites = $activites->count();
-            
-            // Récupérer les participations du jeune pour ces activités
+
             $participations = Act_Jeune::where('jeune_id', $request->jeune_id)
                 ->whereIn('activite_id', $activites->pluck('id'))
                 ->count();
-                
+
             $estComplete = ($participations === $totalActivites) && ($totalActivites > 0);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -332,12 +464,10 @@ foreach ($participations as $p) {
                     'etape_id' => $request->etape_id,
                     'total_activites' => $totalActivites,
                     'activites_validees' => $participations,
-                    'est_complete' => $estComplete,
-                    'peut_passer_etape_suivante' => $estComplete
+                    'est_complete' => $estComplete
                 ],
                 'message' => $estComplete ? 'Toutes les activités sont validées' : 'Il reste des activités à valider'
             ], 200);
-            
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -348,32 +478,27 @@ foreach ($participations as $p) {
     }
 
     /**
-     * OPTIONNEL: RÉCUPÉRER LES STATISTIQUES D'UN JEUNE
+     * STATISTIQUES D'UN JEUNE
      * Endpoint: GET /api/suivi/jeune/{id}/statistiques
      */
-    public function getStatistiquesJeune (Request $request, $id) {
+    public function getStatistiquesJeune(Request $request, $id)
+    {
         try {
-            // Vérifier que le jeune appartient au chef connecté
             $user = $request->user();
             $chef = CU::find($user->id);
-            
-            $jeune = Jeune::with(['branche' => function($query) {
-                $query->orderBy('ordreBranche');
-            }, 'branche.etapes' => function($query) {
-                $query->orderBy('numEtape');
-            }, 'branche.etapes.activites'])
+
+            $jeune = Jeune::with(['branche'])
                 ->where('id', $id)
                 ->where('cu_id', $chef->id)
                 ->first();
-                
+
             if (!$jeune) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Jeune introuvable ou ne vous appartient pas'
                 ], 404);
             }
-            
-            // Vérifier que le jeune a une branche
+
             if (!$jeune->branche) {
                 return response()->json([
                     'success' => true,
@@ -383,29 +508,25 @@ foreach ($participations as $p) {
                             'nom' => $jeune->nom
                         ],
                         'statistiques' => [
-                            'total_activites_branche' => 0,
+                            'total_activites' => 0,
                             'activites_validees' => 0,
-                            'pourcentage_progression' => '0%'
+                            'pourcentage' => '0%'
                         ]
                     ],
                     'message' => 'Ce jeune n\'est pas assigné à une branche'
                 ], 200);
             }
-            
-            // Compter les participations
+
             $totalParticipations = Act_Jeune::where('jeune_id', $id)->count();
-            
-            // Compter le nombre total d'activités dans sa branche
-            $totalActivitesBranche = 0;
-            foreach ($jeune->branche->etapes as $etape) {
-                $totalActivitesBranche += $etape->activites->count();
-            }
-            
-            // Calculer le pourcentage de progression
-            $pourcentage = $totalActivitesBranche > 0 
-                ? round(($totalParticipations / $totalActivitesBranche) * 100, 2)
+
+            $totalActivites = Activite::whereHas('etape', function ($query) use ($jeune) {
+                $query->where('branche_id', $jeune->branche_id);
+            })->count();
+
+            $pourcentage = $totalActivites > 0
+                ? round(($totalParticipations / $totalActivites) * 100, 2)
                 : 0;
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -416,17 +537,16 @@ foreach ($participations as $p) {
                     'branche' => [
                         'id' => $jeune->branche->id,
                         'nom' => $jeune->branche->nomBranche,
-                        'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
+                        'ordreBranche' => $jeune->branche->ordreBranche
                     ],
                     'statistiques' => [
-                        'total_activites_branche' => $totalActivitesBranche,
+                        'total_activites' => $totalActivites,
                         'activites_validees' => $totalParticipations,
-                        'pourcentage_progression' => $pourcentage . '%'
+                        'pourcentage' => $pourcentage . '%'
                     ]
                 ],
                 'message' => 'Statistiques récupérées avec succès'
             ], 200);
-            
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
