@@ -105,6 +105,9 @@ Route::middleware('auth:jeune')->group(function() {
     Route::get('/mon-suivi', [JeuneProgressionController::class, 'getMaProgression']);
     Route::get('/mes-statistiques', [JeuneProgressionController::class, 'getMesStatistiques']);
     Route::get('/mes-badges', [JeuneProgressionController::class, 'getMesBadges']);
+
+    // Consultation des réunions
+    Route::get('/jeune/reunions', [ReunionController::class, 'getReunionsForJeune']);
 });
 
 // ==================== ROUTES COMMUNES POUR TOUS LES UTILISATEURS AUTHENTIFIÉS ====================

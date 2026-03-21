@@ -338,4 +338,70 @@ class ReunionController extends Controller
             ], 500);
         }
     }
+
+    /**
+ * Récupérer les réunions pour un jeune (lecture seule)
+ * Endpoint: GET /api/jeune/reunions
+ */
+public function getReunionsForJeune(Request $request)
+{
+    try {
+        $jeune = $request->user();
+        
+        if (!$jeune) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jeune non authentifié'
+            ], 401);
+        }
+
+        // Vérifier que le jeune a un CU
+        if (!$jeune->cu_id) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'message' => 'Vous n\'êtes pas assigné à un chef d\'unité'
+            ], 200);
+        }
+
+        // Récupérer les réunions du CU du jeune
+        $reunions = Reunion::with('presences')
+            ->where('cu_id', $jeune->cu_id)
+            ->orderBy('date_reunion', 'desc')
+            ->get();
+
+        $formattedReunions = [];
+
+        foreach ($reunions as $reunion) {
+            // Vérifier si le jeune est présent
+            $presence = $reunion->presences->where('jeune_id', $jeune->id)->first();
+            
+            $formattedReunions[] = [
+                'id' => $reunion->id,
+                'date_reunion' => $reunion->date_reunion,
+                'heure_debut' => $reunion->heure_debut,
+                'heure_fin' => $reunion->heure_fin,
+                'is_presented' => $reunion->is_presented,
+                'is_present' => $presence ? true : false,
+                'presence_id' => $presence ? $presence->id : null,
+                'presence_date' => $presence ? $presence->created_at : null,
+                'created_at' => $reunion->created_at,
+                'updated_at' => $reunion->updated_at,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $formattedReunions,
+            'message' => 'Réunions récupérées avec succès'
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur lors de la récupération des réunions',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 }
