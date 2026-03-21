@@ -17,24 +17,28 @@ class JeuneProgressionController extends Controller
     public function getMaProgression(Request $request)
     {
         try {
-            // Récupérer le jeune connecté
-            $jeune = $request->user(); // L'utilisateur est un jeune (guard 'jeune')
+            $jeune = $request->user();
             
-            // Charger ses relations avec tri de la branche par ordreBranche
+            // Charger les relations
             $jeune->load(['branche' => function($query) {
                 $query->orderBy('ordreBranche');
             }, 'branche.etapes' => function($query) {
-                $query->orderBy('numEtape'); // Trier les étapes par numéro d'étape
+                $query->orderBy('numEtape');
             }, 'branche.etapes.activites']);
             
-            // Récupérer ses participations
+            // Récupérer les participations
             $participations = Act_Jeune::where('jeune_id', $jeune->id)->get();
             
             // Construire le tableau de participation
             $participationMap = [];
+            $participationDetails = [];
             foreach ($participations as $p) {
-                $key = $p->jeune_id . '_' . $p->activite_id;
-                $participationMap[$key] = true;
+                $participationMap[$p->activite_id] = true;
+                $participationDetails[$p->activite_id] = [
+                    'id' => $p->id,
+                    'statut' => $p->statut,
+                    'created_at' => $p->created_at
+                ];
             }
             
             // Vérifier que le jeune a une branche
@@ -42,60 +46,117 @@ class JeuneProgressionController extends Controller
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'id' => $jeune->id,
-                        'nom' => $jeune->nom,
-                        'age' => $jeune->age,
-                        'photo' => $jeune->photo,
+                        'jeune' => [
+                            'id' => $jeune->id,
+                            'nom' => $jeune->nom ?? '',
+                            'age' => $jeune->age,
+                            'photo' => $jeune->photo,
+                            'email' => $jeune->email ?? '',
+                            'tel' => $jeune->tel ?? '',
+                        ],
                         'branche' => null,
-                        'etapes' => []
+                        'etapes' => [],
+                        'statistiques' => [
+                            'total_activites' => 0,
+                            'activites_validees' => 0,
+                            'pourcentage' => 0,
+                            'badges_obtenus' => 0,
+                            'total_badges' => 0
+                        ]
                     ],
                     'message' => 'Vous n\'êtes pas encore assigné à une branche'
                 ], 200);
             }
             
-            // Construire la réponse (MÊME STRUCTURE QUE getSuiviComplet)
-            $resultat = [
-                'id' => $jeune->id,
-                'nom' => $jeune->nom,
-                'age' => $jeune->age,
-                'photo' => $jeune->photo,
-                'branche' => [
-                    'id' => $jeune->branche->id,
-                    'nomBranche' => $jeune->branche->nomBranche,
-                    'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
-                ],
-                'etapes' => []
-            ];
+            // Calculer les statistiques
+            $totalActivites = 0;
+            $totalBadges = 0;
+            $badgesObtenus = 0;
+            $activitesValidees = 0;
+            
+            $etapesData = [];
             
             foreach ($jeune->branche->etapes as $etape) {
                 $etapeData = [
                     'id' => $etape->id,
                     'nom' => $etape->nom,
                     'numEtape' => $etape->numEtape,
+                    'total_activites' => $etape->activites->count(),
+                    'activites_validees' => 0,
+                    'est_complete' => false,
                     'activites' => []
                 ];
                 
-                // Trier les activités par date ou par nom si nécessaire
-                $activites = $etape->activites->sortBy('nom_act');
+                $activitesValideesEtape = 0;
                 
-                foreach ($activites as $activite) {
-                    $key = $jeune->id . '_' . $activite->id;
-                    $isParticipated = isset($participationMap[$key]);
+                foreach ($etape->activites as $activite) {
+                    $totalActivites++;
+                    $isParticipated = isset($participationMap[$activite->id]);
+                    
+                    if ($isParticipated) {
+                        $activitesValideesEtape++;
+                        $activitesValidees++;
+                    }
+                    
+                    // Gestion des badges
+                    $badgeData = null;
+                    if ($activite->badge) {
+                        $totalBadges++;
+                        if ($isParticipated) {
+                            $badgesObtenus++;
+                        }
+                        $badgeData = [
+                            'id' => $activite->id,
+                            'nom' => $activite->nom_act,
+                            'image' => $activite->badge,
+                            'obtenu' => $isParticipated,
+                            'date_obtention' => $isParticipated ? ($participationDetails[$activite->id]['created_at'] ?? null) : null
+                        ];
+                    }
                     
                     $etapeData['activites'][] = [
                         'id' => $activite->id,
-                        'nom_act' => $activite->nom_act,
+                        'nom' => $activite->nom_act,
                         'description' => $activite->description,
-                        'badge' => $activite->badge,
+                        'badge' => $badgeData,
                         'date_debut' => $activite->date_debut,
                         'date_fin' => $activite->date_fin,
-                        'is_participated' => $isParticipated
+                        'is_participated' => $isParticipated,
+                        'participation' => $isParticipated ? ($participationDetails[$activite->id] ?? null) : null
                     ];
                 }
                 
-                // Ajouter toutes les étapes même celles qui n'ont pas d'activités
-                $resultat['etapes'][] = $etapeData;
+                $etapeData['activites_validees'] = $activitesValideesEtape;
+                $etapeData['est_complete'] = ($activitesValideesEtape === $etapeData['total_activites']) && $etapeData['total_activites'] > 0;
+                
+                $etapesData[] = $etapeData;
             }
+            
+            $pourcentage = $totalActivites > 0 ? round(($activitesValidees / $totalActivites) * 100, 2) : 0;
+            
+            $resultat = [
+                'jeune' => [
+                    'id' => $jeune->id,
+                    'nom' => $jeune->nom ?? '',
+                    'age' => $jeune->age,
+                    'photo' => $jeune->photo,
+                    'email' => $jeune->email ?? '',
+                    'tel' => $jeune->tel ?? '',
+                ],
+                'branche' => [
+                    'id' => $jeune->branche->id,
+                    'nom' => $jeune->branche->nomBranche,
+                    'ordre' => $jeune->branche->ordreBranche
+                ],
+                'statistiques' => [
+                    'total_activites' => $totalActivites,
+                    'activites_validees' => $activitesValidees,
+                    'pourcentage' => $pourcentage,
+                    'badges_obtenus' => $badgesObtenus,
+                    'total_badges' => $totalBadges
+                ],
+                'etapes' => $etapesData
+            ];
             
             return response()->json([
                 'success' => true,
@@ -107,7 +168,7 @@ class JeuneProgressionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération de votre progression',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -121,21 +182,21 @@ class JeuneProgressionController extends Controller
         try {
             $jeune = $request->user();
             
-            // Charger les relations avec tri
             $jeune->load(['branche' => function($query) {
                 $query->orderBy('ordreBranche');
             }, 'branche.etapes' => function($query) {
                 $query->orderBy('numEtape');
             }, 'branche.etapes.activites']);
             
-            // Vérifier que le jeune a une branche
             if (!$jeune->branche) {
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'total_activites_branche' => 0,
+                        'total_activites' => 0,
                         'activites_validees' => 0,
-                        'pourcentage_progression' => '0%',
+                        'pourcentage' => 0,
+                        'badges_obtenus' => 0,
+                        'total_badges' => 0,
                         'etapes' => []
                     ],
                     'message' => 'Vous n\'êtes pas encore assigné à une branche'
@@ -144,25 +205,44 @@ class JeuneProgressionController extends Controller
             
             $totalParticipations = Act_Jeune::where('jeune_id', $jeune->id)->count();
             
-            $totalActivitesBranche = 0;
+            $totalActivites = 0;
+            $totalBadges = 0;
+            $badgesObtenus = 0;
+            
             foreach ($jeune->branche->etapes as $etape) {
-                $totalActivitesBranche += $etape->activites->count();
+                foreach ($etape->activites as $activite) {
+                    $totalActivites++;
+                    if ($activite->badge) {
+                        $totalBadges++;
+                    }
+                }
             }
             
-            $pourcentage = $totalActivitesBranche > 0 
-                ? round(($totalParticipations / $totalActivitesBranche) * 100, 2)
-                : 0;
+            // Compter les badges obtenus
+            $participations = Act_Jeune::where('jeune_id', $jeune->id)
+                ->with('activite')
+                ->get();
+            
+            foreach ($participations as $participation) {
+                if ($participation->activite && $participation->activite->badge) {
+                    $badgesObtenus++;
+                }
+            }
+            
+            $pourcentage = $totalActivites > 0 ? round(($totalParticipations / $totalActivites) * 100, 2) : 0;
             
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'total_activites_branche' => $totalActivitesBranche,
+                    'total_activites' => $totalActivites,
                     'activites_validees' => $totalParticipations,
-                    'pourcentage_progression' => $pourcentage . '%',
+                    'pourcentage' => $pourcentage,
+                    'badges_obtenus' => $badgesObtenus,
+                    'total_badges' => $totalBadges,
                     'branche' => [
                         'id' => $jeune->branche->id,
-                        'nomBranche' => $jeune->branche->nomBranche,
-                        'ordreBranche' => $jeune->branche->ordreBranche // ← AJOUT
+                        'nom' => $jeune->branche->nomBranche,
+                        'ordre' => $jeune->branche->ordreBranche
                     ],
                     'etapes' => $jeune->branche->etapes->map(function($etape) use ($jeune) {
                         $activitesValidees = Act_Jeune::where('jeune_id', $jeune->id)
@@ -186,7 +266,62 @@ class JeuneProgressionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération des statistiques',
-                'erreur' => $e->getMessage()
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * RÉCUPÉRER LES BADGES OBTENUS PAR LE JEUNE
+     * Endpoint: GET /api/mes-badges
+     */
+    public function getMesBadges(Request $request)
+    {
+        try {
+            $jeune = $request->user();
+            
+            // Récupérer toutes les participations avec leurs activités
+            $participations = Act_Jeune::where('jeune_id', $jeune->id)
+                ->with('activite')
+                ->get();
+            
+            // Filtrer uniquement les activités qui ont un badge
+            $badges = [];
+            
+            foreach ($participations as $participation) {
+                $activite = $participation->activite;
+                
+                // Vérifier si l'activité a un badge
+                if ($activite && $activite->badge) {
+                    $badges[] = [
+                        'id' => $activite->id,
+                        'nom' => $activite->nom_act,
+                        'image' => $activite->badge,
+                        'date_obtention' => $participation->created_at,
+                        'etape_nom' => $activite->etape ? $activite->etape->nom : null
+                    ];
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'badges' => $badges,
+                    'total' => count($badges),
+                    'jeune' => [
+                        'id' => $jeune->id,
+                        'nom' => $jeune->nom ?? '',
+                        'photo' => $jeune->photo
+                    ]
+                ],
+                'message' => 'Badges récupérés avec succès'
+            ], 200);
+            
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des badges',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

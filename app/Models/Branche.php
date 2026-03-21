@@ -44,6 +44,11 @@ class Branche extends Model
         return $this->hasMany(CU::class);
     }
 
+    public function etapes()
+    {
+        return $this->hasMany(Etape::class);
+    }
+
     // Vérifier si un âge correspond à la branche
     public function ageEstValide($age)
     {
