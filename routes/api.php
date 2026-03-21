@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActiviteController;
+use App\Http\Controllers\ActiviteSpecialeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BrancheController;
 use App\Http\Controllers\RegionController;
@@ -81,6 +82,14 @@ Route::middleware('auth:cu')->group(function() {
     Route::post('/update/activite/{id}', [ActiviteController::class, 'updateActivite']);
     Route::delete('/delete/activite/{id}', [ActiviteController::class, 'deleteActivite']);
 
+     // Routes pour les activités spéciales
+    Route::get('/activites-speciales/types', [ActiviteSpecialeController::class, 'getTypes']);
+    Route::post('/create/activites-speciales', [ActiviteSpecialeController::class, 'createActiviteSpeciale']);
+    Route::get('/read/activites-speciales', [ActiviteSpecialeController::class, 'readActivitesSpeciales']);
+    Route::get('/read/activites-speciales/{id}', [ActiviteSpecialeController::class, 'getActiviteById']);
+    Route::post('/update/activites-speciales/{id}', [ActiviteSpecialeController::class, 'updateActiviteSpeciale']);
+    Route::delete('/delete/activites-speciales/{id}', [ActiviteSpecialeController::class, 'deleteActiviteSpeciale']);
+
     // Routes pour le suivi des jeunes
     Route::get('/chef/mes-jeunes', [SuiviJeuneController::class, 'getMesJeunes']);
     Route::get('/suivi/jeunes', [SuiviJeuneController::class, 'getSuiviComplet']);
@@ -105,6 +114,9 @@ Route::middleware('auth:jeune')->group(function() {
     Route::get('/mon-suivi', [JeuneProgressionController::class, 'getMaProgression']);
     Route::get('/mes-statistiques', [JeuneProgressionController::class, 'getMesStatistiques']);
     Route::get('/mes-badges', [JeuneProgressionController::class, 'getMesBadges']);
+
+    // Consultation des activités spéciales
+    Route::get('/jeune/activites-speciales', [ActiviteSpecialeController::class, 'getForJeune']);
 
     // Consultation des réunions
     Route::get('/jeune/reunions', [ReunionController::class, 'getReunionsForJeune']);
