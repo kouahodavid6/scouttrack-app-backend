@@ -41,8 +41,8 @@ class ActiviteSpecialeController extends Controller
             'type' => 'required|string|in:sortie,camp,rencontre,service,formation,celebrations,sport,autre',
             'date_debut' => 'required|date|after_or_equal:today',
             'date_fin' => 'nullable|date|after_or_equal:date_debut',
-            'heure_debut' => 'nullable|date_format:H:i',
-            'heure_fin' => 'nullable|date_format:H:i|after:heure_debut',
+            'heure_debut' => 'nullable|string',
+            'heure_fin' => 'nullable|string',
             'lieu' => 'nullable|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
@@ -193,10 +193,10 @@ class ActiviteSpecialeController extends Controller
             'type' => 'required|string|in:sortie,camp,rencontre,service,formation,celebrations,sport,autre',
             'date_debut' => 'required|date',
             'date_fin' => 'nullable|date|after_or_equal:date_debut',
-            'heure_debut' => 'nullable|date_format:H:i',
-            'heure_fin' => 'nullable|date_format:H:i|after:heure_debut',
+            'heure_debut' => 'nullable|string',
+            'heure_fin' => 'nullable|string',
             'lieu' => 'nullable|string|max:255',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|file|image|mimes:jpeg,png,jpg,gif|max:2048',
             'remove_image' => 'nullable|boolean'
         ]);
 
@@ -226,13 +226,15 @@ class ActiviteSpecialeController extends Controller
                 ], 404);
             }
 
-            // Gestion de l'image
-            if ($request->hasFile('image') && $request->file('image')->isValid()) {
-                $image = $this->uploadImageToHosting($request->image);
+        // Gestion de l'image
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $image = $this->uploadImageToHosting($request->file('image'));
+            if ($image) {
                 $activite->image = $image;
-            } elseif ($request->remove_image) {
-                $activite->image = null;
             }
+        } elseif ($request->has('remove_image') && $request->remove_image) {
+            $activite->image = null;
+        }
 
             // Mise à jour des champs
             $activite->nom = $request->nom;
