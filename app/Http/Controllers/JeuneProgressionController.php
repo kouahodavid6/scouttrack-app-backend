@@ -3,10 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Act_Jeune;
-use App\Models\Jeune;
-use App\Models\Activite;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class JeuneProgressionController extends Controller
 {
