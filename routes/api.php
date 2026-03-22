@@ -124,6 +124,7 @@ Route::middleware('auth:jeune')->group(function() {
 
 // ==================== ROUTES COMMUNES POUR TOUS LES UTILISATEURS AUTHENTIFIÉS ====================
 Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(function() {
+
     // Routes de profil - TOUS LES UTILISATEURS ONT ACCÈS
     Route::get('/profil', [ProfilController::class, 'getProfil']);
     Route::post('/profil/update', [ProfilController::class, 'updateProfil']);
