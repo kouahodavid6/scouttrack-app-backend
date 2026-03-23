@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
 
@@ -41,6 +42,18 @@ class CU extends Authenticatable
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+    }
+
+    // Relation avec le groupe
+    public function groupe(): BelongsTo
+    {
+        return $this->belongsTo(Groupe::class);
+    }
+
+    // Relation avec branche
+    public function branche(): BelongsTo
+    {
+        return $this->belongsTo(Branche::class);
     }
 
     public function reunions()

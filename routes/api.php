@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActiviteController;
 use App\Http\Controllers\ActiviteSpecialeController;
+use App\Http\Controllers\AnnonceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BrancheController;
 use App\Http\Controllers\RegionController;
@@ -124,6 +125,13 @@ Route::middleware('auth:jeune')->group(function() {
 
 // ==================== ROUTES COMMUNES POUR TOUS LES UTILISATEURS AUTHENTIFIÉS ====================
 Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(function() {
+    // Routes d'annonce - TOUS LES UTILISATEURS ONT ACCÈS
+    Route::get('/annonces', [AnnonceController::class, 'readAnnonces']);
+    Route::get('/annonces/cibles', [AnnonceController::class, 'getCibles']);
+    Route::post('/create/annonce', [AnnonceController::class, 'createAnnonce']);
+    Route::get('/read/mes-annonces', [AnnonceController::class, 'readMesAnnonces']);
+    Route::put('/update/annonce/{id}', [AnnonceController::class, 'updateAnnonce']);
+    Route::delete('/delete/annonce/{id}', [AnnonceController::class, 'deleteAnnonce']);
 
     // Routes de profil - TOUS LES UTILISATEURS ONT ACCÈS
     Route::get('/profil', [ProfilController::class, 'getProfil']);
