@@ -10,6 +10,8 @@ use App\Http\Controllers\DistrictController;
 use App\Http\Controllers\GroupeController;
 use App\Http\Controllers\CUController;
 use App\Http\Controllers\EtapeController;
+use App\Http\Controllers\ForumPriveController;
+use App\Http\Controllers\ForumPublicController;
 use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
 use App\Http\Controllers\PresenceController;
@@ -137,4 +139,24 @@ Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(functi
     Route::get('/profil', [ProfilController::class, 'getProfil']);
     Route::post('/profil/update', [ProfilController::class, 'updateProfil']);
     Route::post('/profil/change-password', [ProfilController::class, 'changePassword']);
+
+    // Routes pour le forum privé (avec authentification)
+    // Posts
+    Route::get('/private/read/posts-comments', [ForumPriveController::class, 'getPostsCommentsPrivates']);
+    Route::post('/private/add/post', [ForumPriveController::class, 'addPostPrivate']);
+    Route::post('/private/update/post/{id}', [ForumPriveController::class, 'updatePostPrivate']);
+    Route::delete('/private/delete/post/{id}', [ForumPriveController::class, 'deletePostPrivate']);
+
+    // Comments
+    Route::post('/private/add/{postId}/comments', [ForumPriveController::class, 'addCommentPrivate']);
+    Route::post('/private/update/comment/{id}', [ForumPriveController::class, 'updateCommentPrivate']);
+    Route::delete('/private/delete/comment/{id}', [ForumPriveController::class, 'deleteCommentPrivate']);
+});
+
+// ==================== ROUTES Public POUR TOUS LES UTILISATEURS NON - AUTHENTIFIÉS ====================
+Route::prefix('public')->group(function() {
+    // Routes pour le forum public (sans authentification)
+    Route::get('/read/posts-comments', [ForumPublicController::class, 'getPostsCommentsPublics']);
+    Route::post('/add/post', [ForumPublicController::class, 'addPostPublic']);
+    Route::post('/add/{postId}/comments', [ForumPublicController::class, 'addCommentPublic']);
 });
