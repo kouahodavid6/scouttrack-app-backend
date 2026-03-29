@@ -49,6 +49,11 @@ class Post extends Model
         return $this->hasMany(Comment::class, 'post_id')->orderBy('created_at', 'asc');
     }
 
+    public function likes()
+    {
+        return $this->morphMany(Like::class, 'likeable');
+    }
+
     public function isAuthor($userType, $userId)
     {
         return $this->author_type === $userType && $this->author_id === $userId;

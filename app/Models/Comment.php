@@ -49,6 +49,10 @@ class Comment extends Model
     {
         return $this->morphTo('author', 'author_type', 'author_id');
     }
+    public function likes()
+    {
+        return $this->morphMany(Like::class, 'likeable');
+    }
 
     public function isAuthor($userType, $userId)
     {

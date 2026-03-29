@@ -14,6 +14,7 @@ use App\Http\Controllers\ForumPriveController;
 use App\Http\Controllers\ForumPublicController;
 use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
+use App\Http\Controllers\LikeController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfilController;
 use App\Http\Controllers\ReunionController;
@@ -151,7 +152,12 @@ Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(functi
     Route::post('/private/add/{postId}/comments', [ForumPriveController::class, 'addCommentPrivate']);
     Route::post('/private/update/comment/{id}', [ForumPriveController::class, 'updateCommentPrivate']);
     Route::delete('/private/delete/comment/{id}', [ForumPriveController::class, 'deleteCommentPrivate']);
+    
+    // Forum privé — likes
+    Route::post('/private/like/post/{postId}', [LikeController::class, 'togglePostLikePrivate']);
+    Route::post('/private/like/comment/{commentId}', [LikeController::class, 'toggleCommentLikePrivate']);
 });
+
 
 // ==================== ROUTES Public POUR TOUS LES UTILISATEURS NON - AUTHENTIFIÉS ====================
 Route::prefix('public')->group(function() {
@@ -159,4 +165,8 @@ Route::prefix('public')->group(function() {
     Route::get('/read/posts-comments', [ForumPublicController::class, 'getPostsCommentsPublics']);
     Route::post('/add/post', [ForumPublicController::class, 'addPostPublic']);
     Route::post('/add/{postId}/comments', [ForumPublicController::class, 'addCommentPublic']);
+
+
+    // Forum public — likes
+    Route::post('/like/post/{postId}', [LikeController::class, 'togglePostLikePublic']);
 });
