@@ -76,6 +76,7 @@ class ForumPublicController extends Controller
             ], 422);
         }
 
+        // Règle : L'audio doit être seul, sans message, photo ou vidéo
         if ($hasAudio && ($hasMessage || $hasPhoto || $hasVideo)) {
             return response()->json([
                 'success' => false,
@@ -92,7 +93,6 @@ class ForumPublicController extends Controller
                 'message' => $request->message
             ];
 
-            // Images : ImgBB
             if ($hasPhoto) {
                 try {
                     $data['photo_url'] = $this->cloudinaryService->uploadImage($request->file('photo'));
@@ -101,7 +101,6 @@ class ForumPublicController extends Controller
                 }
             }
 
-            // Vidéos : Cloudinary
             if ($hasVideo) {
                 $uploadResult = $this->cloudinaryService->uploadVideo($request->file('video'));
                 if ($uploadResult['success']) {
@@ -111,11 +110,11 @@ class ForumPublicController extends Controller
                 }
             }
 
-            // Audio : Cloudinary
             if ($hasAudio) {
                 $uploadResult = $this->cloudinaryService->uploadAudio($request->audio_data);
                 if ($uploadResult['success']) {
                     $data['audio_url'] = $uploadResult['url'];
+                    $data['message'] = null; // Pas de message quand audio seul
                 } else {
                     throw new \Exception("Erreur upload audio: " . $uploadResult['error']);
                 }
@@ -174,16 +173,23 @@ class ForumPublicController extends Controller
             ], 422);
         }
 
+        // Règle : L'audio doit être seul
+        if ($hasAudio && ($hasMessage || $hasVideo)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'L\'audio doit être envoyé seul sans message ou vidéo'
+            ], 422);
+        }
+
         try {
             $data = [
                 'post_id' => $postId,
                 'author_type' => 'visitor',
                 'author_id' => null,
                 'author_name' => $request->author_name ?? 'Anonyme',
-                'message' => $request->message
+                'message' => $hasAudio ? null : $request->message
             ];
 
-            // Vidéo : Cloudinary
             if ($hasVideo) {
                 $uploadResult = $this->cloudinaryService->uploadVideo($request->file('video'));
                 if ($uploadResult['success']) {
@@ -193,7 +199,6 @@ class ForumPublicController extends Controller
                 }
             }
 
-            // Audio : Cloudinary
             if ($hasAudio) {
                 $uploadResult = $this->cloudinaryService->uploadAudio($request->audio_data);
                 if ($uploadResult['success']) {

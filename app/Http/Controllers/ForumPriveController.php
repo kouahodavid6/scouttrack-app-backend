@@ -6,7 +6,6 @@ use App\Models\Post;
 use App\Models\Comment;
 use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 
 class ForumPriveController extends Controller
@@ -17,16 +16,34 @@ class ForumPriveController extends Controller
     {
         $this->cloudinaryService = $cloudinaryService;
     }
+
+    /**
+     * Retourne un type normalisé pour l'auteur (ex: 'cu', 'nation', etc.)
+     * au lieu du nom brut de la table (ex: 'c_u_s', 'nations', etc.)
+     */
+    private function getUserType($user): string
+    {
+        $map = [
+            \App\Models\Nation::class   => 'nation',
+            \App\Models\Region::class   => 'region',
+            \App\Models\District::class => 'district',
+            \App\Models\Groupe::class   => 'groupe',
+            \App\Models\CU::class       => 'cu',
+            \App\Models\Jeune::class    => 'jeune',
+        ];
+
+        return $map[get_class($user)] ?? $user->getTable();
+    }
     
     // Lister tous les posts privés
     public function getPostsCommentsPrivates(Request $request)
     {
         try {
             $user = $request->user();
-            $userType = $user->getTable();
+            $userType = $this->getUserType($user);
             
             $posts = Post::where('context', 'private')
-                ->with(['comments' => function($query) use ($userType, $user) {
+                ->with(['comments' => function($query) {
                     $query->orderBy('created_at', 'asc');
                 }])
                 ->orderBy('created_at', 'desc')
@@ -56,12 +73,12 @@ class ForumPriveController extends Controller
     public function addPostPrivate(Request $request)
     {
         $user = $request->user();
-        $userType = $user->getTable();
+        $userType = $this->getUserType($user);
 
         $validator = Validator::make($request->all(), [
-            'message' => 'nullable|string',
-            'photo' => 'nullable|image|max:5120',
-            'video' => 'nullable|file|mimes:mp4,mov,avi|max:20480',
+            'message'    => 'nullable|string',
+            'photo'      => 'nullable|image|max:5120',
+            'video'      => 'nullable|file|mimes:mp4,mov,avi|max:20480',
             'audio_data' => 'nullable|string',
         ]);
 
@@ -72,9 +89,9 @@ class ForumPriveController extends Controller
             ], 422);
         }
 
-        $hasAudio = $request->has('audio_data') && !empty($request->audio_data);
-        $hasPhoto = $request->hasFile('photo');
-        $hasVideo = $request->hasFile('video');
+        $hasAudio   = $request->has('audio_data') && !empty($request->audio_data);
+        $hasPhoto   = $request->hasFile('photo');
+        $hasVideo   = $request->hasFile('video');
         $hasMessage = $request->filled('message');
 
         if (!$hasMessage && !$hasPhoto && !$hasVideo && !$hasAudio) {
@@ -94,13 +111,12 @@ class ForumPriveController extends Controller
         try {
             $data = [
                 'author_type' => $userType,
-                'author_id' => $user->id,
+                'author_id'   => $user->id,
                 'author_name' => $user->nom ?? $user->name ?? $user->email,
-                'context' => 'private',
-                'message' => $request->message
+                'context'     => 'private',
+                'message'     => $request->message
             ];
 
-            // Images : ImgBB
             if ($hasPhoto) {
                 try {
                     $data['photo_url'] = $this->cloudinaryService->uploadImage($request->file('photo'));
@@ -109,7 +125,6 @@ class ForumPriveController extends Controller
                 }
             }
 
-            // Vidéos : Cloudinary
             if ($hasVideo) {
                 $uploadResult = $this->cloudinaryService->uploadVideo($request->file('video'));
                 if ($uploadResult['success']) {
@@ -119,11 +134,11 @@ class ForumPriveController extends Controller
                 }
             }
 
-            // Audio : Cloudinary
             if ($hasAudio) {
                 $uploadResult = $this->cloudinaryService->uploadAudio($request->audio_data);
                 if ($uploadResult['success']) {
                     $data['audio_url'] = $uploadResult['url'];
+                    $data['message']   = null;
                 } else {
                     throw new \Exception("Erreur upload audio: " . $uploadResult['error']);
                 }
@@ -135,14 +150,14 @@ class ForumPriveController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Post créé avec succès',
-                'data' => $post
+                'data'    => $post
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la création du post',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -150,8 +165,8 @@ class ForumPriveController extends Controller
     // Modifier un post
     public function updatePostPrivate(Request $request, $id)
     {
-        $user = $request->user();
-        $userType = $user->getTable();
+        $user     = $request->user();
+        $userType = $this->getUserType($user);
         
         $post = Post::where('context', 'private')->find($id);
         
@@ -171,14 +186,14 @@ class ForumPriveController extends Controller
 
         $validator = Validator::make($request->all(), [
             'message' => 'nullable|string',
-            'photo' => 'nullable|image|max:5120',
-            'video' => 'nullable|file|mimes:mp4,mov,avi|max:20480',
+            'photo'   => 'nullable|image|max:5120',
+            'video'   => 'nullable|file|mimes:mp4,mov,avi|max:20480',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
@@ -187,7 +202,6 @@ class ForumPriveController extends Controller
                 $post->message = $request->message;
             }
             
-            // Images : ImgBB
             if ($request->hasFile('photo')) {
                 try {
                     $post->photo_url = $this->cloudinaryService->uploadImage($request->file('photo'));
@@ -196,7 +210,6 @@ class ForumPriveController extends Controller
                 }
             }
             
-            // Vidéos : Cloudinary
             if ($request->hasFile('video')) {
                 $uploadResult = $this->cloudinaryService->uploadVideo($request->file('video'));
                 if ($uploadResult['success']) {
@@ -212,14 +225,14 @@ class ForumPriveController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Post modifié avec succès',
-                'data' => $post
+                'data'    => $post
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la modification du post',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -227,8 +240,8 @@ class ForumPriveController extends Controller
     // Supprimer un post
     public function deletePostPrivate(Request $request, $id)
     {
-        $user = $request->user();
-        $userType = $user->getTable();
+        $user     = $request->user();
+        $userType = $this->getUserType($user);
         
         $post = Post::where('context', 'private')->find($id);
         
@@ -258,7 +271,7 @@ class ForumPriveController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression du post',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -266,8 +279,8 @@ class ForumPriveController extends Controller
     // Ajouter un commentaire
     public function addCommentPrivate(Request $request, $postId)
     {
-        $user = $request->user();
-        $userType = $user->getTable();
+        $user     = $request->user();
+        $userType = $this->getUserType($user);
         
         $post = Post::where('context', 'private')->find($postId);
         
@@ -279,20 +292,20 @@ class ForumPriveController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'message' => 'nullable|string',
-            'video' => 'nullable|file|mimes:mp4,mov,avi|max:20480',
+            'message'    => 'nullable|string',
+            'video'      => 'nullable|file|mimes:mp4,mov,avi|max:20480',
             'audio_data' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
-        $hasAudio = $request->has('audio_data') && !empty($request->audio_data);
-        $hasVideo = $request->hasFile('video');
+        $hasAudio   = $request->has('audio_data') && !empty($request->audio_data);
+        $hasVideo   = $request->hasFile('video');
         $hasMessage = $request->filled('message');
 
         if (!$hasMessage && !$hasVideo && !$hasAudio) {
@@ -302,16 +315,22 @@ class ForumPriveController extends Controller
             ], 422);
         }
 
+        if ($hasAudio && ($hasMessage || $hasVideo)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'L\'audio doit être envoyé seul sans message ou vidéo'
+            ], 422);
+        }
+
         try {
             $data = [
-                'post_id' => $postId,
+                'post_id'     => $postId,
                 'author_type' => $userType,
-                'author_id' => $user->id,
+                'author_id'   => $user->id,
                 'author_name' => $user->nom ?? $user->name ?? $user->email,
-                'message' => $request->message
+                'message'     => $hasAudio ? null : $request->message
             ];
 
-            // Vidéos : Cloudinary
             if ($hasVideo) {
                 $uploadResult = $this->cloudinaryService->uploadVideo($request->file('video'));
                 if ($uploadResult['success']) {
@@ -321,7 +340,6 @@ class ForumPriveController extends Controller
                 }
             }
 
-            // Audio : Cloudinary
             if ($hasAudio) {
                 $uploadResult = $this->cloudinaryService->uploadAudio($request->audio_data);
                 if ($uploadResult['success']) {
@@ -337,14 +355,14 @@ class ForumPriveController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Commentaire ajouté avec succès',
-                'data' => $comment
+                'data'    => $comment
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'ajout du commentaire',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -352,8 +370,8 @@ class ForumPriveController extends Controller
     // Modifier un commentaire
     public function updateCommentPrivate(Request $request, $id)
     {
-        $user = $request->user();
-        $userType = $user->getTable();
+        $user     = $request->user();
+        $userType = $this->getUserType($user);
         
         $comment = Comment::find($id);
         
@@ -378,7 +396,7 @@ class ForumPriveController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
@@ -392,14 +410,14 @@ class ForumPriveController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Commentaire modifié avec succès',
-                'data' => $comment
+                'data'    => $comment
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la modification du commentaire',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -407,8 +425,8 @@ class ForumPriveController extends Controller
     // Supprimer un commentaire
     public function deleteCommentPrivate(Request $request, $id)
     {
-        $user = $request->user();
-        $userType = $user->getTable();
+        $user     = $request->user();
+        $userType = $this->getUserType($user);
         
         $comment = Comment::find($id);
         
@@ -438,7 +456,7 @@ class ForumPriveController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression du commentaire',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }

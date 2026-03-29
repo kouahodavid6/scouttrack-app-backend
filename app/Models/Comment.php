@@ -25,6 +25,8 @@ class Comment extends Model
 
     protected $keyType = 'string';
     public $incrementing = false;
+    
+    // Ajouter author_details à la réponse JSON
     protected $appends = ['author_details'];
 
     protected static function boot()
@@ -53,10 +55,8 @@ class Comment extends Model
         return $this->author_type === $userType && $this->author_id === $userId;
     }
     
-    // Accesseur pour obtenir les détails de l'auteur
     public function getAuthorDetailsAttribute()
     {
-        // Pour les visiteurs (forum public)
         if ($this->author_type === 'visitor') {
             return [
                 'name' => $this->author_name ?? 'Anonyme',
@@ -67,7 +67,6 @@ class Comment extends Model
             ];
         }
         
-        // Pour les utilisateurs authentifiés
         $modelClass = $this->getModelClassForType($this->author_type);
         if ($modelClass && $this->author_id) {
             $author = $modelClass::find($this->author_id);

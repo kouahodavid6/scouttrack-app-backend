@@ -33,6 +33,7 @@ return array(
     'App\\Models\\Annonce' => $baseDir . '/app/Models/Annonce.php',
     'App\\Models\\Branche' => $baseDir . '/app/Models/Branche.php',
     'App\\Models\\CU' => $baseDir . '/app/Models/CU.php',
+    'App\\Models\\Comment' => $baseDir . '/app/Models/Comment.php',
     'App\\Models\\District' => $baseDir . '/app/Models/District.php',
     'App\\Models\\Etape' => $baseDir . '/app/Models/Etape.php',
     'App\\Models\\Groupe' => $baseDir . '/app/Models/Groupe.php',

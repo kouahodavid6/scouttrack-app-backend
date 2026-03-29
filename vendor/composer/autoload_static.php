@@ -563,6 +563,7 @@ class ComposerStaticInitc514d8f7b9fc5970bdd94287905ef584
         'App\\Models\\Annonce' => __DIR__ . '/../..' . '/app/Models/Annonce.php',
         'App\\Models\\Branche' => __DIR__ . '/../..' . '/app/Models/Branche.php',
         'App\\Models\\CU' => __DIR__ . '/../..' . '/app/Models/CU.php',
+        'App\\Models\\Comment' => __DIR__ . '/../..' . '/app/Models/Comment.php',
         'App\\Models\\District' => __DIR__ . '/../..' . '/app/Models/District.php',
         'App\\Models\\Etape' => __DIR__ . '/../..' . '/app/Models/Etape.php',
         'App\\Models\\Groupe' => __DIR__ . '/../..' . '/app/Models/Groupe.php',

@@ -24,6 +24,8 @@ class Post extends Model
 
     protected $keyType = 'string';
     public $incrementing = false;
+    
+    // Ajouter author_details à la réponse JSON
     protected $appends = ['author_details'];
 
     protected static function boot()
@@ -37,7 +39,6 @@ class Post extends Model
         });
     }
 
-    // Relation polymorphique avec les différents types d'utilisateurs
     public function author()
     {
         return $this->morphTo('author', 'author_type', 'author_id');
@@ -48,7 +49,6 @@ class Post extends Model
         return $this->hasMany(Comment::class, 'post_id')->orderBy('created_at', 'asc');
     }
 
-    // Vérifier si l'utilisateur est l'auteur
     public function isAuthor($userType, $userId)
     {
         return $this->author_type === $userType && $this->author_id === $userId;
@@ -57,7 +57,6 @@ class Post extends Model
     // Accesseur pour obtenir les détails de l'auteur
     public function getAuthorDetailsAttribute()
     {
-        // Pour les visiteurs (forum public)
         if ($this->author_type === 'visitor') {
             return [
                 'name' => $this->author_name ?? 'Anonyme',
@@ -68,7 +67,6 @@ class Post extends Model
             ];
         }
         
-        // Pour les utilisateurs authentifiés
         $modelClass = $this->getModelClassForType($this->author_type);
         if ($modelClass && $this->author_id) {
             $author = $modelClass::find($this->author_id);
