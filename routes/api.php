@@ -5,6 +5,7 @@ use App\Http\Controllers\ActiviteSpecialeController;
 use App\Http\Controllers\AnnonceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BrancheController;
+use App\Http\Controllers\CotisationController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\DistrictController;
 use App\Http\Controllers\GroupeController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\ForumPublicController;
 use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
 use App\Http\Controllers\LikeController;
+use App\Http\Controllers\PaiementController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfilController;
 use App\Http\Controllers\ReunionController;
@@ -30,28 +32,28 @@ use Illuminate\Support\Facades\Route;
 // Route publique pour la connexion
 Route::post('/login', [AuthController::class, 'login']);
 
-// ------------------------- Routes pour Nation -------------------------
+// ======================================== Routes pour Nation ========================================
 Route::middleware('auth:nation')->group(function() {
     Route::post('/create/region', [RegionController::class, 'createRegion']);
     Route::get('/read/regions', [RegionController::class, 'readRegions']);
     Route::delete('/delete/region/{id}', [RegionController::class, 'deleteRegion']);
 });
 
-// ------------------------- Routes pour Région -------------------------
+// ======================================== Routes pour Région ========================================
 Route::middleware('auth:region')->group(function() {
     Route::post('/create/district', [DistrictController::class, 'createDistrict']);
     Route::get('/read/districts', [DistrictController::class, 'readDistricts']);
     Route::delete('/delete/district/{id}', [DistrictController::class, 'deleteDistrict']);
 });
 
-// ------------------------- Routes pour District -------------------------
+// ======================================== Routes pour District ========================================
 Route::middleware('auth:district')->group(function() {
     Route::post('/create/groupe', [GroupeController::class, 'createGroupe']);
     Route::get('/read/groupes', [GroupeController::class, 'readGroupes']);
     Route::delete('/delete/groupe/{id}', [GroupeController::class, 'deleteGroupe']);
 });
 
-// ------------------------- Routes pour Groupe -------------------------
+// ======================================== Routes pour Groupe ========================================
 Route::middleware('auth:groupe')->group(function() {
     // Opérations CRUD pour chefs d'unités
     Route::post('/create/cu', [CUController::class, 'createCU']);
@@ -65,7 +67,7 @@ Route::middleware('auth:groupe')->group(function() {
     Route::delete('/delete/branche/{id}', [BrancheController::class, 'deleteBranche']);
 });
 
-// ------------------------- Routes pour Chef d'Unité (CU) -------------------------
+// ======================================== Routes pour Chef d'Unité (CU) ========================================
 Route::middleware('auth:cu')->group(function() {
     // Opérations CRUD pour jeunes
     Route::post('/create/jeune', [JeuneController::class, 'createJeune']);
@@ -110,9 +112,19 @@ Route::middleware('auth:cu')->group(function() {
     Route::put('/update/reunion/{id}', [ReunionController::class, 'updateReunion']);
     Route::delete('/delete/reunion/{id}', [ReunionController::class, 'deleteReunion']);
     Route::post('/valider/presence/{reunion_id}', [PresenceController::class, 'presence']);
+
+    // Routes pour les cotisations (CU)
+    Route::prefix('cotisations')->group(function() {
+        Route::get('/', [CotisationController::class, 'getCotisationsCU']);
+        Route::post('/create', [CotisationController::class, 'createCotisation']);
+        Route::put('/update/{id}', [CotisationController::class, 'updateCotisation']);
+        Route::delete('/delete/{id}', [CotisationController::class, 'deleteCotisation']);
+        Route::get('/{id}/details', [CotisationController::class, 'getCotisationDetails']);
+        Route::get('/{id}/export-pdf', [CotisationController::class, 'exportPayeursPDF']);
+    });
 });
 
-// ------------------------- Routes pour Jeune -------------------------
+// ======================================== Routes pour Jeune ========================================
 Route::middleware('auth:jeune')->group(function() {
     // Consultation de la progression (lecture seule)
     Route::get('/mon-suivi', [JeuneProgressionController::class, 'getMaProgression']);
@@ -124,7 +136,23 @@ Route::middleware('auth:jeune')->group(function() {
 
     // Consultation des réunions
     Route::get('/jeune/reunions', [ReunionController::class, 'getReunionsForJeune']);
+
+    // Routes pour les cotisations (Jeune)
+    Route::prefix('cotisations')->group(function() {
+        Route::get('/jeune/liste', [CotisationController::class, 'getCotisationsJeune']);
+    });
+
+    // Routes pour les paiements
+    Route::prefix('paiements')->group(function() {
+        Route::post('/initier', [PaiementController::class, 'initierPaiement']);
+        Route::get('/verifier/{id}', [PaiementController::class, 'verifierPaiement']);
+        Route::get('/mes-paiements', [PaiementController::class, 'getMesPaiements']);
+    });
 });
+
+// Webhook public pour Kkiapay
+Route::post('/webhook/kkiapay', [PaiementController::class, 'webhookKkiapay']);
+
 
 // ==================== ROUTES COMMUNES POUR TOUS LES UTILISATEURS AUTHENTIFIÉS ====================
 Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(function() {
@@ -158,7 +186,6 @@ Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(functi
     Route::post('/private/like/comment/{commentId}', [LikeController::class, 'toggleCommentLikePrivate']);
 });
 
-
 // ==================== ROUTES Public POUR TOUS LES UTILISATEURS NON - AUTHENTIFIÉS ====================
 Route::prefix('public')->group(function() {
     // Routes pour le forum public (sans authentification)
@@ -170,3 +197,4 @@ Route::prefix('public')->group(function() {
     // Forum public — likes
     Route::post('/like/post/{postId}', [LikeController::class, 'togglePostLikePublic']);
 });
+
