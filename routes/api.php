@@ -17,6 +17,7 @@ use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\PaiementController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfilController;
 use App\Http\Controllers\ReunionController;
@@ -31,6 +32,13 @@ use Illuminate\Support\Facades\Route;
 
 // Route publique pour la connexion
 Route::post('/login', [AuthController::class, 'login']);
+// Routes pour la réinitialisation de mot de passe
+Route::prefix('password')->group(function () {
+    Route::post('/forgot', [PasswordResetController::class, 'forgotPassword']);
+    Route::post('/verify-otp', [PasswordResetController::class, 'verifyOTP']);
+    Route::post('/reset', [PasswordResetController::class, 'resetPassword']);
+    Route::post('/resend-otp', [PasswordResetController::class, 'resendOTP']);
+});
 
 // ======================================== Routes pour Nation ========================================
 Route::middleware('auth:nation')->group(function() {
