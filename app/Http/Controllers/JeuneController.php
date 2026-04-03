@@ -6,6 +6,7 @@ use App\Mail\SendCredentialsMail;
 use App\Models\Branche;
 use App\Models\CU;
 use App\Models\Jeune;
+use App\Models\Parents;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -43,6 +44,29 @@ class JeuneController extends Controller
         $password = str_shuffle($password);
         
         // Retourne "Reg" + mot de passe mélangé
+        return $prefix . $password;
+    }
+
+    /**
+     * Générer un mot de passe pour parent
+     */
+    private function generateParentPassword()
+    {
+        $prefix = 'Par';
+        $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        $numbers = '0123456789';
+
+        $password = $uppercase[random_int(0, 25)];
+        $password .= $lowercase[random_int(0, 25)];
+        $password .= $numbers[random_int(0, 9)];
+
+        $allChars = $uppercase . $lowercase . $numbers;
+        for ($i = 0; $i < 5; $i++) { 
+            $password .= $allChars[random_int(0, strlen($allChars) - 1)];
+        }
+
+        $password = str_shuffle($password);
         return $prefix . $password;
     }
 
@@ -258,6 +282,201 @@ class JeuneController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Lier un parent à un jeune (crée le parent et le lie simultanément)
+     * Un parent ne peut pas exister sans être lié à un enfant
+     */
+    public function lienParent(Request $request, $jeuneId)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'nom' => 'required|string|max:255',
+            'tel' => 'nullable|string',
+            'lien' => 'required|in:pere,mere,tuteur',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
+        try {
+            $jeune = Jeune::where('id', $jeuneId)
+                ->where('cu_id', $request->user()->id)
+                ->first();
+
+            if (!$jeune) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jeune non trouvé ou ne vous appartient pas'
+                ], 404);
+            }
+
+            // Vérifier si le jeune a déjà un parent
+            $existingParent = $jeune->parents()->first();
+            if ($existingParent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce jeune a déjà un parent associé. Veuillez d\'abord supprimer le parent existant.'
+                ], 400);
+            }
+
+            // Vérifier si l'email est déjà utilisé par un autre parent (normalement pas possible)
+            $parent = Parents::where('email', $request->email)->first();
+            if ($parent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cet email est déjà utilisé par un autre parent.'
+                ], 400);
+            }
+
+            // Créer le parent (il sera directement lié au jeune)
+            $generatedPassword = $this->generateParentPassword();
+            $parent = Parents::create([
+                'nom' => $request->nom,
+                'email' => $request->email,
+                'tel' => $request->tel,
+                'password' => Hash::make($generatedPassword),
+                'is_active' => true
+            ]);
+
+            // Lier le parent au jeune
+            $jeune->parents()->attach($parent->id, [
+                'lien' => $request->lien,
+                'autorisation_camp' => false,
+                'autorisations' => json_encode([])
+            ]);
+
+            // Envoyer les identifiants par email
+            Mail::to($request->email)->send(new SendCredentialsMail(
+                $request->nom,
+                $request->email,
+                $generatedPassword,
+                "compte Parent"
+            ));
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'parent' => $parent,
+                    'jeune' => $jeune
+                ],
+                'message' => 'Parent créé et lié avec succès'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la création du parent',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Récupérer le parent d'un jeune
+     */
+    public function getParentByJeune(Request $request, $jeuneId)
+    {
+        try {
+            $user = $request->user();
+            
+            $jeune = Jeune::where('id', $jeuneId)
+                ->where('cu_id', $user->id)
+                ->first();
+
+            if (!$jeune) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jeune non trouvé ou ne vous appartient pas'
+                ], 404);
+            }
+
+            $parent = $jeune->parents()->first();
+
+            if (!$parent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aucun parent associé à ce jeune'
+                ], 404);
+            }
+
+            // Récupérer les infos du pivot
+            $pivot = $parent->pivot;
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $parent->id,
+                    'nom' => $parent->nom,
+                    'email' => $parent->email,
+                    'tel' => $parent->tel,
+                    'photo' => $parent->photo,
+                    'lien' => $pivot->lien,
+                    'autorisation_camp' => (bool) $pivot->autorisation_camp,
+                    'autorisations' => json_decode($pivot->autorisations, true) ?? [],
+                    'created_at' => $pivot->created_at
+                ],
+                'message' => 'Parent récupéré avec succès'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération du parent',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Supprimer un parent (supprime définitivement le parent et la liaison)
+     */
+    public function deleteParent(Request $request, $jeuneId)
+    {
+        try {
+            $user = $request->user();
+            
+            $jeune = Jeune::where('id', $jeuneId)
+                ->where('cu_id', $user->id)
+                ->first();
+
+            if (!$jeune) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jeune non trouvé ou ne vous appartient pas'
+                ], 404);
+            }
+
+            $parent = $jeune->parents()->first();
+
+            if (!$parent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aucun parent associé à ce jeune'
+                ], 404);
+            }
+
+            // Supprimer le parent (la liaison se supprime automatiquement grâce à onDelete('cascade'))
+            $parent->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Parent supprimé avec succès'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la suppression du parent',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
 
     // Fonction pour uploader l'image vers le service d'hébergement gratuit (ImgBB)

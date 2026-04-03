@@ -1,0 +1,384 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\DemandeAutorisation;
+use App\Models\ReponseAutorisation;
+use App\Models\Jeune;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+
+class AutorisationController extends Controller
+{
+    /**
+     * CU : Récupérer toutes les demandes envoyées
+     */
+    public function getMesDemandes(Request $request)
+    {
+        try {
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifié'
+                ], 401);
+            }
+
+            $demandes = DemandeAutorisation::where('cu_id', $cu->id)
+                ->with(['reponses' => function($query) {
+                    $query->with(['jeune', 'parent']);
+                }])
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($demande) use ($cu) {
+                    $totalJeunes = Jeune::where('cu_id', $cu->id)->count();
+                    $totalReponses = $demande->reponses->count();
+                    $estComplete = $totalJeunes > 0 && $totalReponses >= $totalJeunes;
+                    
+                    return [
+                        'id' => $demande->id,
+                        'titre' => $demande->titre,
+                        'description' => $demande->description,
+                        'date_activite' => $demande->date_activite,
+                        'lieu' => $demande->lieu,
+                        'status' => $estComplete ? 'terminee' : $demande->status,
+                        'est_complete' => $estComplete,
+                        'created_at' => $demande->created_at,
+                        'reponses' => $demande->reponses->map(function ($reponse) {
+                            return [
+                                'id' => $reponse->id,
+                                'reponse' => $reponse->reponse,
+                                'jeune' => $reponse->jeune ? [
+                                    'id' => $reponse->jeune->id,
+                                    'nom' => $reponse->jeune->nom
+                                ] : null,
+                                'parent' => $reponse->parent ? [
+                                    'id' => $reponse->parent->id,
+                                    'nom' => $reponse->parent->nom,
+                                    'email' => $reponse->parent->email,
+                                    'tel' => $reponse->parent->tel
+                                ] : null,
+                                'donnees_formulaire' => $reponse->donnees_formulaire,
+                                'signature' => $reponse->signature,
+                                'created_at' => $reponse->created_at
+                            ];
+                        }),
+                        'taux_participation' => $demande->taux_participation
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $demandes
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getMesDemandes: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    /**
+     * CU : Supprimer une demande
+     */
+    public function supprimerDemande(Request $request, $id)
+    {
+        try {
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifié'
+                ], 401);
+            }
+
+            $demande = DemandeAutorisation::where('cu_id', $cu->id)->find($id);
+
+            if (!$demande) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Demande non trouvée'
+                ], 404);
+            }
+
+            $demande->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Demande supprimée avec succès'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('supprimerDemande: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    /**
+     * CU : Récupérer les réponses d'une demande
+     */
+    public function getReponses(Request $request, $id)
+    {
+        try {
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifié'
+                ], 401);
+            }
+
+            $demande = DemandeAutorisation::where('cu_id', $cu->id)->find($id);
+
+            if (!$demande) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Demande non trouvée'
+                ], 404);
+            }
+
+            $reponses = $demande->reponses()->with(['jeune', 'parent'])->get()->map(function ($reponse) {
+                return [
+                    'id' => $reponse->id,
+                    'reponse' => $reponse->reponse,
+                    'jeune' => $reponse->jeune ? [
+                        'id' => $reponse->jeune->id,
+                        'nom' => $reponse->jeune->nom
+                    ] : null,
+                    'parent' => $reponse->parent ? [
+                        'id' => $reponse->parent->id,
+                        'nom' => $reponse->parent->nom,
+                        'email' => $reponse->parent->email,
+                        'tel' => $reponse->parent->tel
+                    ] : null,
+                    'donnees_formulaire' => $reponse->donnees_formulaire,
+                    'signature' => $reponse->signature,
+                    'created_at' => $reponse->created_at
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $reponses
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getReponses: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    /**
+     * CU : Envoyer une demande d'autorisation
+     */
+    public function envoyerDemande(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'titre' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'date_activite' => 'required|date',
+            'lieu' => 'required|string|max:255',
+            'texte_trous' => 'nullable|array'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
+        try {
+            $cu = $request->user();
+
+            if (!$cu) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifié'
+                ], 401);
+            }
+
+            $demande = DemandeAutorisation::create([
+                'cu_id' => $cu->id,
+                'titre' => $request->titre,
+                'description' => $request->description,
+                'date_activite' => $request->date_activite,
+                'lieu' => $request->lieu,
+                'texte_trous' => $request->texte_trous ?? $this->getDefaultTexteTrous(),
+                'status' => 'en_attente'
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $demande,
+                'message' => 'Demande envoyée avec succès'
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('envoyerDemande: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    /**
+     * Parent : Récupérer les demandes en attente pour ses enfants
+     */
+    public function getDemandesParent(Request $request)
+    {
+        try {
+            $parent = $request->user();
+            $enfants = $parent->enfants()->pluck('jeunes.id')->toArray();
+
+            $demandes = DemandeAutorisation::where('status', 'en_attente')
+                ->with(['reponses' => function($query) use ($parent) {
+                    $query->where('parent_id', $parent->id);
+                }])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $demandesArray = $demandes->map(function($demande) use ($enfants) {
+                $reponsesParEnfant = [];
+                foreach ($enfants as $jeuneId) {
+                    $reponse = $demande->reponses->where('jeune_id', $jeuneId)->first();
+                    $reponsesParEnfant[$jeuneId] = $reponse ? [
+                        'id' => $reponse->id,
+                        'reponse' => $reponse->reponse,
+                        'donnees_formulaire' => $reponse->donnees_formulaire,
+                        'created_at' => $reponse->created_at
+                    ] : null;
+                }
+                
+                return [
+                    'id' => $demande->id,
+                    'titre' => $demande->titre,
+                    'description' => $demande->description,
+                    'date_activite' => $demande->date_activite,
+                    'lieu' => $demande->lieu,
+                    'status' => $demande->status,
+                    'created_at' => $demande->created_at,
+                    'reponses_par_enfant' => $reponsesParEnfant
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $demandesArray
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getDemandesParent: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    /**
+     * Parent : Répondre à une demande
+     */
+    public function repondreDemande(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'jeune_id' => 'required|uuid|exists:jeunes,id',
+            'reponse' => 'required|in:oui,non',
+            'donnees_formulaire' => 'nullable|array',
+            'signature' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
+        try {
+            $parent = $request->user();
+            $demande = DemandeAutorisation::find($id);
+
+            if (!$demande) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Demande non trouvée'
+                ], 404);
+            }
+
+            // Vérifier que le parent a bien cet enfant
+            if (!$parent->hasEnfant($request->jeune_id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous n\'avez pas accès à cet enfant'
+                ], 403);
+            }
+
+            // Vérifier si déjà répondu
+            $existingReponse = ReponseAutorisation::where('demande_id', $id)
+                ->where('parent_id', $parent->id)
+                ->where('jeune_id', $request->jeune_id)
+                ->first();
+
+            if ($existingReponse) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous avez déjà répondu à cette demande pour cet enfant'
+                ], 400);
+            }
+
+            // Créer la réponse
+            $reponse = ReponseAutorisation::create([
+                'demande_id' => $id,
+                'parent_id' => $parent->id,
+                'jeune_id' => $request->jeune_id,
+                'reponse' => $request->reponse,
+                'donnees_formulaire' => $request->donnees_formulaire,
+                'signature' => $request->signature
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $reponse,
+                'message' => 'Réponse enregistrée avec succès'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('repondreDemande: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    private function getDefaultTexteTrous()
+    {
+        return [
+            'template' => "Je soussigné(e) [NOM_PARENT], en qualité de [LIEN_PARENT], autorise mon enfant [NOM_ENFANT] né(e) le [DATE_NAISSANCE], à participer à l'activité \"[TITRE_ACTIVITE]\". Fait à [VILLE], le [DATE_JOUR].",
+            'fields' => [
+                'NOM_PARENT' => ['type' => 'text', 'label' => 'Nom du parent', 'required' => true],
+                'LIEN_PARENT' => ['type' => 'select', 'label' => 'Lien de parenté', 'options' => ['Père', 'Mère', 'Tuteur'], 'required' => true],
+                'NOM_ENFANT' => ['type' => 'text', 'label' => 'Nom de l\'enfant', 'required' => true],
+                'DATE_NAISSANCE' => ['type' => 'date', 'label' => 'Date de naissance', 'required' => true],
+                'TITRE_ACTIVITE' => ['type' => 'text', 'label' => 'Titre de l\'activité', 'required' => true],
+                'VILLE' => ['type' => 'text', 'label' => 'Ville', 'required' => true],
+                'DATE_JOUR' => ['type' => 'date', 'label' => 'Date du jour', 'required' => true]
+            ]
+        ];
+    }
+}

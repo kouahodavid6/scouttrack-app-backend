@@ -51,6 +51,14 @@ class Jeune extends Model
         });
     }
 
+    public function parents()
+    {
+        return $this->belongsToMany(Parents::class, 'enfant_parents', 'jeune_id', 'parent_id')
+            ->using(EnfantParent::class)
+            ->withPivot(['id', 'lien', 'autorisation_camp', 'autorisations'])
+            ->withTimestamps();
+    }
+
     // Accesseur pour l'âge (calculé automatiquement depuis date_naissance)
     public function getAgeAttribute()
     {
@@ -66,5 +74,10 @@ class Jeune extends Model
     public function branche(): BelongsTo
     {
         return $this->belongsTo(Branche::class);
+    }
+
+    public function reponsesAutorisations()
+    {
+        return $this->hasMany(ReponseAutorisation::class, 'jeune_id');
     }
 }

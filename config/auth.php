@@ -64,6 +64,10 @@ return [
             'driver' => 'sanctum',
             'provider' => 'jeunes',
         ],
+        'parent' => [
+            'driver' => 'sanctum',
+            'provider' => 'parents',
+        ],
     ],
 
     /*
@@ -111,6 +115,10 @@ return [
         'jeunes' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\Jeune::class),
+        ],
+        'parents' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Parents::class,
         ],
 
         // 'users' => [

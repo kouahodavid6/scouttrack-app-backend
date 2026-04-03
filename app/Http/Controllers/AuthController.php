@@ -8,6 +8,7 @@ use App\Models\District;
 use App\Models\Groupe;
 use App\Models\CU;
 use App\Models\Jeune;
+use App\Models\Parents;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -164,6 +165,34 @@ class AuthController extends Controller
                         'token' => $token
                     ],
                     'message' => 'Jeune connecté avec succès.'
+                ], 200);
+            }
+
+            // 7. Vérifier Parent
+            $parent = Parents::where('email', $request->email)->first();
+            if ($parent && Hash::check($request->password, $parent->password)) {
+                if (!$parent->is_active) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Votre compte est désactivé. Veuillez contacter votre chef d\'unité.'
+                    ], 403);
+                }
+
+                $token = $parent->createToken('parent_token')->plainTextToken;
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'id' => $parent->id,
+                        'nom' => $parent->nom,
+                        'email' => $parent->email,
+                        'tel' => $parent->tel,
+                        'photo' => $parent->photo,
+                        'role' => $parent->role,
+                        'type' => 'parent',
+                        'token' => $token
+                    ],
+                    'message' => 'Parent connecté avec succès.'
                 ], 200);
             }
 

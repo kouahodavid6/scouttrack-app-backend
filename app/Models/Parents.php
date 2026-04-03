@@ -4,25 +4,23 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
 
-class CU extends Authenticatable
+class Parents extends Authenticatable
 {
     use HasApiTokens, HasFactory;
 
-    protected $table = 'c_u_s';
+    protected $table = 'parents';
     
     protected $fillable = [
         'nom',
+        'email',
         'tel',
         'photo',
-        'email',
         'password',
         'role',
-        'groupe_id',
-        'branche_id'
+        'is_active'
     ];
 
     protected $hidden = [
@@ -44,30 +42,21 @@ class CU extends Authenticatable
         });
     }
 
-    // Relation avec le groupe
-    public function groupe(): BelongsTo
+    public function enfants()
     {
-        return $this->belongsTo(Groupe::class);
+        return $this->belongsToMany(Jeune::class, 'enfant_parents', 'parent_id', 'jeune_id')
+            ->using(EnfantParent::class)
+            ->withPivot(['id', 'lien', 'autorisation_camp', 'autorisations'])
+            ->withTimestamps();
     }
 
-    // Relation avec branche
-    public function branche(): BelongsTo
+    public function hasEnfant($jeuneId)
     {
-        return $this->belongsTo(Branche::class);
+        return $this->enfants()->where('jeune_id', $jeuneId)->exists();
     }
 
-    public function reunions()
+    public function reponsesAutorisations()
     {
-        return $this->hasMany(Reunion::class, 'cu_id');
-    }
-
-    public function jeunes()
-    {
-        return $this->hasMany(Jeune::class, 'cu_id');
-    }
-
-    public function demandesAutorisations()
-    {
-        return $this->hasMany(DemandeAutorisation::class, 'cu_id');
+        return $this->hasMany(ReponseAutorisation::class, 'parent_id');
     }
 }

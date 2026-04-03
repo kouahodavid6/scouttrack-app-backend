@@ -4,6 +4,7 @@ use App\Http\Controllers\ActiviteController;
 use App\Http\Controllers\ActiviteSpecialeController;
 use App\Http\Controllers\AnnonceController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AutorisationController;
 use App\Http\Controllers\BrancheController;
 use App\Http\Controllers\CotisationController;
 use App\Http\Controllers\RegionController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\JeuneController;
 use App\Http\Controllers\JeuneProgressionController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\PaiementController;
+use App\Http\Controllers\ParentController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfilController;
@@ -81,6 +83,13 @@ Route::middleware('auth:cu')->group(function() {
     Route::post('/create/jeune', [JeuneController::class, 'createJeune']);
     Route::get('/read/jeunes', [JeuneController::class, 'readJeunes']);
     Route::delete('/delete/jeune/{id}', [JeuneController::class, 'deleteJeune']);
+    // route pour lier un parent
+    Route::post('/lien-parent/{jeuneId}', [JeuneController::class, 'lienParent']);
+    // Route pour récupérer le parent d'un jeune
+    Route::get('/jeune/{jeuneId}/parent', [JeuneController::class, 'getParentByJeune']);
+    // Route pour supprimer un parent (supprime définitivement)
+    Route::delete('/delete/parent/{jeuneId}', [JeuneController::class, 'deleteParent']);
+
     // Route pour récupérer une branche spécifique
     Route::get('/branche/{id}', [BrancheController::class, 'showBrancheCU']);
 
@@ -103,6 +112,12 @@ Route::middleware('auth:cu')->group(function() {
     Route::get('/read/activites-speciales/{id}', [ActiviteSpecialeController::class, 'getActiviteById']);
     Route::post('/update/activites-speciales/{id}', [ActiviteSpecialeController::class, 'updateActiviteSpeciale']);
     Route::delete('/delete/activites-speciales/{id}', [ActiviteSpecialeController::class, 'deleteActiviteSpeciale']);
+
+    // Routes pour Demandes d'autorisation
+    Route::post('/demande-autorisation', [AutorisationController::class, 'envoyerDemande']);
+    Route::get('/demandes-autorisation', [AutorisationController::class, 'getMesDemandes']);
+    Route::get('/demandes-autorisation/{id}/reponses', [AutorisationController::class, 'getReponses']);
+    Route::delete('/demandes-autorisation/{id}', [AutorisationController::class, 'supprimerDemande']);
 
     // Routes pour le suivi des jeunes
     Route::get('/chef/mes-jeunes', [SuiviJeuneController::class, 'getMesJeunes']);
@@ -158,12 +173,29 @@ Route::middleware('auth:jeune')->group(function() {
     });
 });
 
+// ======================================== Routes pour Parent ========================================
+Route::middleware('auth:parent')->group(function() {
+    // Gestion des enfants
+    Route::get('/parent/enfants', [ParentController::class, 'getEnfants']);
+    Route::get('/parent/enfant/{id}/progression', [ParentController::class, 'getProgressionEnfant']);
+    Route::get('/parent/enfant/{id}/reunions', [ParentController::class, 'getReunionsEnfant']);
+    
+    // Cotisations et paiements
+    Route::get('/parent/cotisations/enfant/{id}', [ParentController::class, 'getCotisationsEnfant']);
+    Route::post('/parent/cotisations/payer', [ParentController::class, 'payerCotisation']);
+    Route::get('/parent/paiements', [ParentController::class, 'getPaiements']);
+    
+    // Autorisation Parentale
+    Route::get('/parent/demandes-autorisation', [AutorisationController::class, 'getDemandesParent']);
+    Route::post('/parent/demande-autorisation/{id}/repondre', [AutorisationController::class, 'repondreDemande']);
+});
+
 // Webhook public pour Kkiapay
 Route::post('/webhook/kkiapay', [PaiementController::class, 'webhookKkiapay']);
 
 
 // ==================== ROUTES COMMUNES POUR TOUS LES UTILISATEURS AUTHENTIFIÉS ====================
-Route::middleware(['auth:nation,region,district,groupe,cu,jeune'])->group(function() {
+Route::middleware(['auth:nation,region,district,groupe,cu,jeune,parent'])->group(function() {
     // Routes d'annonce - TOUS LES UTILISATEURS ONT ACCÈS
     Route::get('/annonces', [AnnonceController::class, 'readAnnonces']);
     Route::get('/annonces/cibles', [AnnonceController::class, 'getCibles']);
