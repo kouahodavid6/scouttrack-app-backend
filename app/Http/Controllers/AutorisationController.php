@@ -8,6 +8,7 @@ use App\Models\Jeune;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class AutorisationController extends Controller
 {
@@ -34,8 +35,15 @@ class AutorisationController extends Controller
                 ->get()
                 ->map(function ($demande) use ($cu) {
                     $totalJeunes = Jeune::where('cu_id', $cu->id)->count();
-                    $totalReponses = $demande->reponses->count();
-                    $estComplete = $totalJeunes > 0 && $totalReponses >= $totalJeunes;
+                    $jeunesAyantRepondu = $demande->reponses()
+                        ->distinct('jeune_id')
+                        ->count('jeune_id');
+                    $estComplete = $totalJeunes > 0 && $jeunesAyantRepondu >= $totalJeunes;
+                    
+                    if ($estComplete && $demande->status !== 'terminee') {
+                        $demande->status = 'terminee';
+                        $demande->save();
+                    }
                     
                     return [
                         'id' => $demande->id,
@@ -43,7 +51,7 @@ class AutorisationController extends Controller
                         'description' => $demande->description,
                         'date_activite' => $demande->date_activite,
                         'lieu' => $demande->lieu,
-                        'status' => $estComplete ? 'terminee' : $demande->status,
+                        'status' => $demande->status,
                         'est_complete' => $estComplete,
                         'created_at' => $demande->created_at,
                         'reponses' => $demande->reponses->map(function ($reponse) {
@@ -291,6 +299,47 @@ class AutorisationController extends Controller
     }
 
     /**
+     * Parent : Récupérer l'historique des réponses
+     */
+    public function getHistoriqueReponses(Request $request)
+    {
+        try {
+            $parent = $request->user();
+            
+            $reponses = ReponseAutorisation::where('parent_id', $parent->id)
+                ->with(['demande', 'jeune'])
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($reponse) {
+                    return [
+                        'id' => $reponse->id,
+                        'demande_id' => $reponse->demande_id,
+                        'demande_titre' => $reponse->demande->titre ?? 'Titre inconnu',
+                        'demande_date_activite' => $reponse->demande->date_activite ?? null,
+                        'demande_lieu' => $reponse->demande->lieu ?? null,
+                        'jeune_nom' => $reponse->jeune->nom ?? 'Jeune inconnu',
+                        'reponse' => $reponse->reponse,
+                        'signature' => $reponse->signature,
+                        'repondu_le' => $reponse->created_at,
+                        'donnees_formulaire' => $reponse->donnees_formulaire,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $reponses
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getHistoriqueReponses: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur'
+            ], 500);
+        }
+    }
+
+    /**
      * Parent : Répondre à une demande
      */
     public function repondreDemande(Request $request, $id)
@@ -310,38 +359,39 @@ class AutorisationController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+            
             $parent = $request->user();
-            $demande = DemandeAutorisation::find($id);
+            $demande = DemandeAutorisation::lockForUpdate()->find($id);
 
             if (!$demande) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Demande non trouvée'
                 ], 404);
             }
 
-            // Vérifier que le parent a bien cet enfant
             if (!$parent->hasEnfant($request->jeune_id)) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Vous n\'avez pas accès à cet enfant'
                 ], 403);
             }
 
-            // Vérifier si déjà répondu
             $existingReponse = ReponseAutorisation::where('demande_id', $id)
-                ->where('parent_id', $parent->id)
                 ->where('jeune_id', $request->jeune_id)
                 ->first();
 
             if ($existingReponse) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Vous avez déjà répondu à cette demande pour cet enfant'
+                    'message' => 'Une réponse a déjà été donnée pour cet enfant'
                 ], 400);
             }
 
-            // Créer la réponse
             $reponse = ReponseAutorisation::create([
                 'demande_id' => $id,
                 'parent_id' => $parent->id,
@@ -351,13 +401,19 @@ class AutorisationController extends Controller
                 'signature' => $request->signature
             ]);
 
+            $demande->updateStatusIfComplete();
+            
+            DB::commit();
+
             return response()->json([
                 'success' => true,
                 'data' => $reponse,
+                'demande_status' => $demande->fresh()->status,
                 'message' => 'Réponse enregistrée avec succès'
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('repondreDemande: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
@@ -369,12 +425,11 @@ class AutorisationController extends Controller
     private function getDefaultTexteTrous()
     {
         return [
-            'template' => "Je soussigné(e) [NOM_PARENT], en qualité de [LIEN_PARENT], autorise mon enfant [NOM_ENFANT] né(e) le [DATE_NAISSANCE], à participer à l'activité \"[TITRE_ACTIVITE]\". Fait à [VILLE], le [DATE_JOUR].",
+            'template' => "Je soussigné(e) [NOM_PARENT], en qualité de [LIEN_PARENT], autorise mon enfant [NOM_ENFANT] à participer à l'activité \"[TITRE_ACTIVITE]\". Fait à [VILLE], le [DATE_JOUR].",
             'fields' => [
                 'NOM_PARENT' => ['type' => 'text', 'label' => 'Nom du parent', 'required' => true],
                 'LIEN_PARENT' => ['type' => 'select', 'label' => 'Lien de parenté', 'options' => ['Père', 'Mère', 'Tuteur'], 'required' => true],
                 'NOM_ENFANT' => ['type' => 'text', 'label' => 'Nom de l\'enfant', 'required' => true],
-                'DATE_NAISSANCE' => ['type' => 'date', 'label' => 'Date de naissance', 'required' => true],
                 'TITRE_ACTIVITE' => ['type' => 'text', 'label' => 'Titre de l\'activité', 'required' => true],
                 'VILLE' => ['type' => 'text', 'label' => 'Ville', 'required' => true],
                 'DATE_JOUR' => ['type' => 'date', 'label' => 'Date du jour', 'required' => true]

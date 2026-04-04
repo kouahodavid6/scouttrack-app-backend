@@ -188,6 +188,7 @@ Route::middleware('auth:parent')->group(function() {
     // Autorisation Parentale
     Route::get('/parent/demandes-autorisation', [AutorisationController::class, 'getDemandesParent']);
     Route::post('/parent/demande-autorisation/{id}/repondre', [AutorisationController::class, 'repondreDemande']);
+    Route::get('/parent/historique-autorisations', [AutorisationController::class, 'getHistoriqueReponses']);
 });
 
 // Webhook public pour Kkiapay
